@@ -9,7 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-** Internal interface definitions for SQLite.
+** Internal interface definitions for SQLite. SQLite的内部接口定义
 **
 */
 #ifndef _SQLITEINT_H_

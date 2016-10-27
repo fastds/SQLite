@@ -9,7 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-**
+** 贯穿整个sqlite的内存分配功能
 ** Memory allocation functions used throughout sqlite.
 */
 #include "sqliteInt.h"

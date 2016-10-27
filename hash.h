@@ -9,6 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
+	该头文件包含：被用于SQLite中的一般的哈希表的实现
 ** This is the header file for the generic hash-table implemenation
 ** used in SQLite.
 */

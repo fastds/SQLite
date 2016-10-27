@@ -9,7 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-**
+**该文件包含了对全局变量和常量的定义
 ** This file contains definitions of global variables and contants.
 */
 #include "sqliteInt.h"
@@ -20,6 +20,12 @@
 ** SQLite only considers US-ASCII (or EBCDIC) characters.  We do not
 ** handle case conversions for the UTF character set since the tables
 ** involved are nearly as big or bigger than SQLite itself.
+*/
+/*
+ASCII
+A-Z:65-90
+a-z:97-122
+
 */
 const unsigned char sqlite3UpperToLower[] = {
 #ifdef SQLITE_ASCII
@@ -60,6 +66,7 @@ const unsigned char sqlite3UpperToLower[] = {
 };
 
 /*
+** 以下256个字节的查找表被用于支持SQLites内置的与以下标准库函数等价的功能
 ** The following 256 byte lookup table is used to support SQLites built-in
 ** equivalents to the following standard library functions:
 **
@@ -70,7 +77,10 @@ const unsigned char sqlite3UpperToLower[] = {
 **   isxdigit()                       0x08
 **   toupper()                        0x20
 **   SQLite identifier character      0x40
-**
+** 如果被映射的字符需要转换为大写，则设置0x20，比如：如果x是一个小写ASCII
+** 字符，那么，他的大小等价式为 (x - 0x20),因此，toupper()能够以如下方式实现：
+** 	(x & ~(map[x]&0x20))
+
 ** Bit 0x20 is set if the mapped character requires translation to upper
 ** case. i.e. if the character is a lower-case ASCII character.
 ** If x is a lower-case ASCII character, then its upper-case equivalent
@@ -174,6 +184,7 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 
 
 /*
+** 哈希表的全局函数 - 函数对所有数据库连接都通用。 初始化之后，该表变成read-only
 ** Hash table for global functions - functions common to all
 ** database connections.  After initialization, this table is
 ** read-only.

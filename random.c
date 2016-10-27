@@ -9,6 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
+** 该文件包含了SQLite中对为随机数生成器的实现。随机数在生成标的随机整型的键或者随机文件名
 ** This file contains code to implement a pseudo-random number
 ** generator (PRNG) for SQLite.
 **
@@ -18,7 +19,9 @@
 #include "sqliteInt.h"
 
 
-/* All threads share a single random number generator.
+/*
+** 所有县城共享同一个随机数生成器。该结构是生成器当前的状态
+** All threads share a single random number generator.
 ** This structure is the current state of the generator.
 */
 static SQLITE_WSD struct sqlite3PrngType {

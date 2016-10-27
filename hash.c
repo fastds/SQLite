@@ -9,6 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
+** SQLite中一般哈希表的实现
 ** This is the implementation of generic hash-tables
 ** used in SQLite.
 */
@@ -19,6 +20,7 @@
 ** fields of the Hash structure.
 **
 ** "pNew" is a pointer to the hash table that is to be initialized.
+**	"pNew"是一个指向将要被初始化的哈希表的指定 
 */
 void sqlite3HashInit(Hash *pNew){
   assert( pNew!=0 );
@@ -31,9 +33,10 @@ void sqlite3HashInit(Hash *pNew){
 /* Remove all entries from a hash table.  Reclaim all memory.
 ** Call this routine to delete a hash table or to reset a hash table
 ** to the empty state.
+ 删除一个哈希表或者将一个哈希表重置为空状态
 */
 void sqlite3HashClear(Hash *pH){
-  HashElem *elem;         /* For looping over all elements of the table */
+  HashElem *elem;         /* For looping over all elements of the table 存储将被遍历的表中的元素*/
 
   assert( pH!=0 );
   elem = pH->first;

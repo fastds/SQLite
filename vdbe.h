@@ -12,7 +12,7 @@
 ** Header file for the Virtual DataBase Engine (VDBE)
 **
 ** This header defines the interface to the virtual database engine
-** or VDBE.  The VDBE implements an abstract machine that runs a
+** or VDBE.  The VDBE implements an abstract machine that runs a  VDBE实现了一个抽象的机器，运行一个简单的程序一访问/修改底层数据库
 ** simple program to access and modify the underlying database.
 */
 #ifndef _SQLITE_VDBE_H_
@@ -20,18 +20,18 @@
 #include <stdio.h>
 
 /*
-** A single VDBE is an opaque structure named "Vdbe".  Only routines
+** A single VDBE is an opaque structure named "Vdbe".  Only routines 一个VDBE是一个讲座“Vdbe”不透明的结构体,只有在源文件sqliteVdbe.c中的函数被允许看到其内部结构
 ** in the source file sqliteVdbe.c are allowed to see the insides
 ** of this structure.
 */
 typedef struct Vdbe Vdbe;
 
 /*
-** The names of the following types declared in vdbeInt.h are required
+** The names of the following types declared in vdbeInt.h are required 以下类型名，在vdbeInt.h中声明来进行VdbeOp定义
 ** for the VdbeOp definition.
 */
 typedef struct VdbeFunc VdbeFunc;
-typedef struct Mem Mem;
+typedef struct Mem Mem;			//用于存储各个类型的单独的值？ 
 typedef struct SubProgram SubProgram;
 
 /*

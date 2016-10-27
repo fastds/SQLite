@@ -45,20 +45,21 @@ Table *sqlite3SrcListLookup(Parse *pParse, SrcList *pSrc){
 }
 
 /*
+** 检查给定的表是可写的。如果不可写，生成错误消息并返回1. 如果可写则返回0.
 ** Check to make sure the given table is writable.  If it is not
 ** writable, generate an error message and return 1.  If it is
 ** writable return 0;
 */
 int sqlite3IsReadOnly(Parse *pParse, Table *pTab, int viewOk){
   /* A table is not writable under the following circumstances:
-  **
-  **   1) It is a virtual table and no implementation of the xUpdate method
+  **表在以下几种情况下不可写：
+  **   1) It is a virtual table and no implementation of the xUpdate method 表是一个虚表，提供的xUpdate方法没有实现
   **      has been provided, or
-  **   2) It is a system table (i.e. sqlite_master), this call is not
+  **   2) It is a system table (i.e. sqlite_master), this call is not 表是一个系统表，如sqlite_master,该调用不是一个嵌套解析的一部分，并且没有声明writable_schema pragma
   **      part of a nested parse and writable_schema pragma has not 
   **      been specified.
   **
-  ** In either case leave an error message in pParse and return non-zero.
+  ** In either case leave an error message in pParse and return non-zero. 以上任意一种情况会保存一个错误消息在pParse中并返回非0值。
   */
   if( ( IsVirtual(pTab) 
      && sqlite3GetVTable(pParse->db, pTab)->pMod->pModule->xUpdate==0 )
