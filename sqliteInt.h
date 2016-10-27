@@ -9,30 +9,30 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-** Internal interface definitions for SQLite. SQLite的内部接口定义
+** Internal interface definitions for SQLite.	//SQLite内部接口的定义
 **
 */
 #ifndef _SQLITEINT_H_
 #define _SQLITEINT_H_
 
 /*
-** These #defines should enable >2GB file support on POSIX if the
-** underlying operating system supports it.  If the OS lacks
+** These #defines should enable >2GB file support on POSIX if the					//如果底层操作系统支持，这些#define应该能够有>2GB的文件大小支持。
+** underlying operating system supports it.  If the OS lacks						//如果OS不支持大型文件，或者OS是windows，这些就应该为no-ops
 ** large file support, or if the OS is windows, these should be no-ops.
 **
-** Ticket #2739:  The _LARGEFILE_SOURCE macro must appear before any
-** system #includes.  Hence, this block of code must be the very first
+** Ticket #2739:  The _LARGEFILE_SOURCE macro must appear before any				//_LARGEFILE_SOURCE宏必须出现在任何系统的 #includes前面
+** system #includes.  Hence, this block of code must be the very first				//因此，这个代码块必须在所有源文件的前面
 ** code in all source files.
 **
-** Large file support can be disabled using the -DSQLITE_DISABLE_LFS switch
-** on the compiler command line.  This is necessary if you are compiling
+** Large file support can be disabled using the -DSQLITE_DISABLE_LFS switch			//大文件支持可以利用命令行-DSQLITE_DISABLE_LFS开关使其失效
+** on the compiler command line.  This is necessary if you are compiling	
 ** on a recent machine (ex: Red Hat 7.2) but you want your code to work
 ** on an older machine (ex: Red Hat 6.0).  If you compile on Red Hat 7.2
 ** without this option, LFS is enable.  But LFS does not exist in the kernel
 ** in Red Hat 6.0, so the code won't work.  Hence, for maximum binary
 ** portability you should omit LFS.
 **
-** Similar is true for Mac OS X.  LFS is only supported on Mac OS X 9 and later.
+** Similar is true for Mac OS X.  LFS is only supported on Mac OS X 9 and later.	
 */
 #ifndef SQLITE_DISABLE_LFS
 # define _LARGE_FILE       1
@@ -43,7 +43,7 @@
 #endif
 
 /*
-** Include the configuration header output by 'configure' if we're using the
+** Include the configuration header output by 'configure' if we're using the	//如果用 autoconf-based构建的'configure'输出，包含一个配置头：'configure' 
 ** autoconf-based build
 */
 #ifdef _HAVE_SQLITE_CONFIG_H
@@ -52,7 +52,7 @@
 
 #include "sqliteLimit.h"
 
-/* Disable nuisance warnings on Borland compilers */
+/* Disable nuisance warnings on Borland compilers */			//关闭Borland编译器上的警告
 #if defined(__BORLANDC__)
 #pragma warn -rch /* unreachable code */
 #pragma warn -ccc /* Condition is always true or false */
@@ -61,13 +61,13 @@
 #pragma warn -spa /* Suspicious pointer arithmetic */
 #endif
 
-/* Needed for various definitions... */
+/* Needed for various definitions... */			//被各种定义需要
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE
 #endif
 
 /*
-** Include standard header files as necessary
+** Include standard header files as necessary	//包含必要的标准头文件
 */
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -77,19 +77,19 @@
 #endif
 
 /*
-** The following macros are used to cast pointers to integers and
-** integers to pointers.  The way you do this varies from one compiler
-** to the next, so we have developed the following set of #if statements
+** The following macros are used to cast pointers to integers and			//以下的宏被用于指针与整数之间的转换。
+** integers to pointers.  The way you do this varies from one compiler		//这样做一遍编译器变换时，一遍我们已经开发
+** to the next, so we have developed the following set of #if statements	// #if 中的语句去生成适应大范围编译器的宏
 ** to generate appropriate macros for a wide range of compilers.
 **
-** The correct "ANSI" way to do this is to use the intptr_t type. 
-** Unfortunately, that typedef is not available on all compilers, or
-** if it is available, it requires an #include of specific headers
+** The correct "ANSI" way to do this is to use the intptr_t type. 			// 用intptr_t类型保证"ANSI" way 
+** Unfortunately, that typedef is not available on all compilers, or		//不幸的是，该类型定义所有编译器上都不可用，
+** if it is available, it requires an #include of specific headers			//或者是需要一个指定头的#include，不同机器头不一样
 ** that vary from one machine to the next.
 **
-** Ticket #3860:  The llvm-gcc-4.2 compiler from Apple chokes on
+** Ticket #3860:  The llvm-gcc-4.2 compiler from Apple chokes on			//
 ** the ((void*)&((char*)0)[X]) construct.  But MSVC chokes on ((void*)(X)).
-** So we have to define the macros in different ways depending on the
+** So we have to define the macros in different ways depending on the		//根据不用的编译器，定义不同的宏
 ** compiler.
 */
 #if defined(__PTRDIFF_TYPE__)  /* This case should work for GCC */
@@ -107,14 +107,14 @@
 #endif
 
 /*
-** The SQLITE_THREADSAFE macro must be defined as 0, 1, or 2.
-** 0 means mutexes are permanently disable and the library is never
-** threadsafe.  1 means the library is serialized which is the highest
-** level of threadsafety.  2 means the libary is multithreaded - multiple
-** threads can use SQLite as long as no two threads try to use the same
+** The SQLITE_THREADSAFE macro must be defined as 0, 1, or 2.				//SQLITE_THREADSAFE的值为0,1,2
+** 0 means mutexes are permanently disable and the library is never			//0:不提供互斥，库永远不线程安全
+** threadsafe.  1 means the library is serialized which is the highest		//1:library序列化，最高等级的线程安全
+** level of threadsafety.  2 means the libary is multithreaded - multiple	//2:多个线程可以使用SQLite，只要两个线程在同一时刻
+** threads can use SQLite as long as no two threads try to use the same		//尝试使用相同的数据库连接
 ** database connection at the same time.
 **
-** Older versions of SQLite used an optional THREADSAFE macro.
+** Older versions of SQLite used an optional THREADSAFE macro.				//
 ** We support that for legacy.
 */
 #if !defined(SQLITE_THREADSAFE)
@@ -126,8 +126,8 @@
 #endif
 
 /*
-** Powersafe overwrite is on by default.  But can be turned off using
-** the -DSQLITE_POWERSAFE_OVERWRITE=0 command-line option.
+** Powersafe overwrite is on by default.  But can be turned off using		//默认开启SQLITE_POWERSAFE_OVERWRITE
+** the -DSQLITE_POWERSAFE_OVERWRITE=0 command-line option.					//可以通过 -DSQLITE_POWERSAFE_OVERWRITE=0命令行选项设置
 */
 #ifndef SQLITE_POWERSAFE_OVERWRITE
 # define SQLITE_POWERSAFE_OVERWRITE 1
