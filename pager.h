@@ -20,33 +20,30 @@
 #define _PAGER_H_
 
 /*
-** Default maximum size for persistent journal files. A negative 
+** Default maximum size for persistent journal files. A negative 					//对当前日志文件定义最大值。一个负数值意味着没有限制。
 ** value means no limit. This value may be overridden using the 
-** sqlite3PagerJournalSizeLimit() API. See also "PRAGMA journal_size_limit".
-** 对当前日志文件定义最大值。一个负数值意味着没有限制。
-** 这个值可能被函数sqlite3PagerJournalSizeLimit（）应用程序界面覆写。也是看“编译指示 journal-size-limit”
+** sqlite3PagerJournalSizeLimit() API. See also "PRAGMA journal_size_limit".		//这个值可能被函数sqlite3PagerJournalSizeLimit（）API覆写。也是看“编译指示 journal_size_limit”
 */
 #ifndef SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT
   #define SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT -1
 #endif
-//如果没有定义SQLite-default-journal-size-limit(SQLite默认日志大小限制)，那就定义一个。
+//如果没有定义SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT（SQLite默认日志大小限制)，那就定义一个。
 /*
-** The type used to represent a page number.  The first page in a file
-** is called page 1.  0 is used to represent "not a page".
-** 这个类型是被用于表示页号的。文件中的第一页被称为page 1，0是被用来表示“不是页面”。
+** The type used to represent a page number.  The first page in a file			// 这个类型是被用于表示页号的。文件中的第一页被称为page 1，
+** is called page 1.  0 is used to represent "not a page".						//0：表示“不是页面”。
 */
 typedef u32 Pgno;
 
 /*
-** Each open file is managed by a separate instance of the "Pager" structure.
+** Each open file is managed by a separate instance of the "Pager" structure.	
 ** 每个打开的文件都是由一个单独的“Pager”结构的实例管理。
 */
-typedef struct Pager Pager;
+typedef struct Pager Pager;				
 
 /*
 ** Handle type for pages.
 */
-typedef struct PgHdr DbPage;	//定义每一个内存页面的页面头结构为DbPage?
+typedef struct PgHdr DbPage;	//页面处理类型
 
 /*
 ** Page number PAGER_MJ_PGNO is never used in an SQLite database (it is
@@ -67,8 +64,8 @@ typedef struct PgHdr DbPage;	//定义每一个内存页面的页面头结构为D
 ** NOTE: These values must match the corresponding BTREE_ values in btree.h.
 ** 允许sqlite3PagerOpen()的标志参数的值。注意:这些值必须匹配相应的在btree.h BTREE值。
 */
-#define PAGER_OMIT_JOURNAL  0x0001    /* Do not use a rollback journal */
-#define PAGER_MEMORY        0x0002    /* In-memory database */
+#define PAGER_OMIT_JOURNAL  0x0001    /* Do not use a rollback journal */			//不使用回滚日志
+#define PAGER_MEMORY        0x0002    /* In-memory database */						//内存数据库
 
 /*
 ** Valid values for the second argument to sqlite3PagerLockingMode().
@@ -102,7 +99,7 @@ int sqlite3PagerOpen(
   sqlite3_vfs*, //pvfs  所应用的虚拟文件系统 ?
   Pager **ppPager, //out：这里返回页面结构
   const char*, // zFilename //所打开的数据库文件名字
-  int, //nExtra 在每一个内存页面上附加的额外的字节？？
+  int, //nExtra 在每一个内存页面上附加的额外的字节
   int,//flags 控制文件的标志？？？
   int,//vfsFlag 通过sqlite3-vfs.XOpen（）的标志？？
   void(*)(DbPage*)
@@ -122,34 +119,34 @@ int sqlite3PagerSetJournalMode(Pager *, int);
 int sqlite3PagerGetJournalMode(Pager*);
 int sqlite3PagerOkToChangeJournalMode(Pager*);
 i64 sqlite3PagerJournalSizeLimit(Pager *, i64);
-sqlite3_backup **sqlite3PagerBackupPtr(Pager*);
-
-/* Functions used to obtain and release page references. 以下函数用来用户获取和释放页面引用*/ 
+sqlite3_backup **sqlite3PagerBackupPtr(Pager*);						//备份的页面指针
+	
+/* Functions used to obtain and release page references. */ 		//以下函数用来用户获取和释放页面引用
 int sqlite3PagerAcquire(Pager *pPager, Pgno pgno, DbPage **ppPage, int clrFlag);
 #define sqlite3PagerGet(A,B,C) sqlite3PagerAcquire(A,B,C,0)
 DbPage *sqlite3PagerLookup(Pager *pPager, Pgno pgno);
-void sqlite3PagerRef(DbPage*);
+void sqlite3PagerRef(DbPage*);	
 void sqlite3PagerUnref(DbPage*);
 
-/* Operations on page references. */
+/* Operations on page references. */  						//DbPage-->实际上就是PgHdr结构体，以下方法是对页面引用的一些操作
 int sqlite3PagerWrite(DbPage*);
 void sqlite3PagerDontWrite(DbPage*);
 int sqlite3PagerMovepage(Pager*,DbPage*,Pgno,int);
-int sqlite3PagerPageRefcount(DbPage*);
-void *sqlite3PagerGetData(DbPage *); 
-void *sqlite3PagerGetExtra(DbPage *); 
+int sqlite3PagerPageRefcount(DbPage*);						//页面引用数
+void *sqlite3PagerGetData(DbPage *); 						//获取页面数据
+void *sqlite3PagerGetExtra(DbPage *); 						//获取页面额外数据(溢出页)
 
-/* Functions used to manage pager transactions and savepoints. 被用户管理页面交互和保留点的功能*/
-void sqlite3PagerPagecount(Pager*, int*);
-int sqlite3PagerBegin(Pager*, int exFlag, int);
-int sqlite3PagerCommitPhaseOne(Pager*,const char *zMaster, int);
-int sqlite3PagerExclusiveLock(Pager*);
-int sqlite3PagerSync(Pager *pPager);
-int sqlite3PagerCommitPhaseTwo(Pager*);
-int sqlite3PagerRollback(Pager*);
+/* Functions used to manage pager transactions and savepoints. */		//被用户管理页面交互和保存点的功能
+void sqlite3PagerPagecount(Pager*, int*);								//Pager包含的页面数
+int sqlite3PagerBegin(Pager*, int exFlag, int);							
+int sqlite3PagerCommitPhaseOne(Pager*,const char *zMaster, int);		//Pager一阶段提交
+int sqlite3PagerExclusiveLock(Pager*);									//Pager互斥锁
+int sqlite3PagerSync(Pager *pPager);									//Pager同步(刷新？)操作
+int sqlite3PagerCommitPhaseTwo(Pager*);									//Pager两阶段提交
+int sqlite3PagerRollback(Pager*);	
 int sqlite3PagerOpenSavepoint(Pager *pPager, int n);
 int sqlite3PagerSavepoint(Pager *pPager, int op, int iSavepoint);
-int sqlite3PagerSharedLock(Pager *pPager);
+int sqlite3PagerSharedLock(Pager *pPager);								//Pager共享锁
 
 int sqlite3PagerCheckpoint(Pager *pPager, int, int*, int*);
 int sqlite3PagerWalSupported(Pager *pPager);
@@ -160,30 +157,30 @@ int sqlite3PagerCloseWal(Pager *pPager);
   int sqlite3PagerWalFramesize(Pager *pPager);
 #endif
 
-/* Functions used to query pager state and configuration. 以下函数用于查询页面状态和配置信息 */
-u8 sqlite3PagerIsreadonly(Pager*);
+/* Functions used to query pager state and configuration. */	//以下函数用于查询页面状态和配置信息
+u8 sqlite3PagerIsreadonly(Pager*);								
 int sqlite3PagerRefcount(Pager*);
 int sqlite3PagerMemUsed(Pager*);
-const char *sqlite3PagerFilename(Pager*, int);
+const char *sqlite3PagerFilename(Pager*, int);					//Pager对应的文件名
 const sqlite3_vfs *sqlite3PagerVfs(Pager*);
 sqlite3_file *sqlite3PagerFile(Pager*);
-const char *sqlite3PagerJournalname(Pager*);
-int sqlite3PagerNosync(Pager*);
-void *sqlite3PagerTempSpace(Pager*);
-int sqlite3PagerIsMemdb(Pager*);
-void sqlite3PagerCacheStat(Pager *, int, int, int *);
-void sqlite3PagerClearCache(Pager *);
+const char *sqlite3PagerJournalname(Pager*);					//Pager日志名
+int sqlite3PagerNosync(Pager*);	
+void *sqlite3PagerTempSpace(Pager*);							//Pager临时空间
+int sqlite3PagerIsMemdb(Pager*);	
+void sqlite3PagerCacheStat(Pager *, int, int, int *);			//Pager缓存状态
+void sqlite3PagerClearCache(Pager *);							//Pager清空缓存
 
-/* Functions used to truncate the database file. */
+/* Functions used to truncate the database file. */				//用户截断数据库文件的功能
 void sqlite3PagerTruncateImage(Pager*,Pgno);
 
 #if defined(SQLITE_HAS_CODEC) && !defined(SQLITE_OMIT_WAL)
 void *sqlite3PagerCodec(DbPage *);
 #endif
 
-/* Functions to support testing and debugging. */
+/* Functions to support testing and debugging. */			//用于支持测试和调试的功能
 #if !defined(NDEBUG) || defined(SQLITE_TEST)
-  Pgno sqlite3PagerPagenumber(DbPage*);
+  Pgno sqlite3PagerPagenumber(DbPage*);							
   int sqlite3PagerIswriteable(DbPage*);
 #endif
 #ifdef SQLITE_TEST

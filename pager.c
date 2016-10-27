@@ -9,12 +9,12 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-** This is the implementation of the page cache subsystem or "pager".
+** This is the implementation of the page cache subsystem or "pager".			//页面缓存子系统或“pager”的实现
 ** 
-** The pager is used to access a database disk file.  It implements
-** atomic commit and rollback through the use of a journal file that
-** is separate from the database file.  The pager also implements file
-** locking to prevent two processes from writing the same database
+** The pager is used to access a database disk file.  It implements				//Pager被用于访问数据库磁盘文件。它通过使用
+** atomic commit and rollback through the use of a journal file that			//独立于数据库文件的日志文件实现了原子提交和回滚
+** is separate from the database file.  The pager also implements file			//pager也实现了文件锁机制，以放置两个线程同时写相同的数据库文件、
+** locking to prevent two processes from writing the same database				//或防止一个线程去读另外一个正在被写的数据库
 ** file simultaneously, or one process from reading the database while
 ** another is writing.
 */
@@ -23,21 +23,21 @@
 #include "wal.h"
 
 
-/******************* NOTES ON THE DESIGN OF THE PAGER ************************
+/******************* NOTES ON THE DESIGN OF THE PAGER ************************			Pager 的设计原则
 **
-** This comment block describes invariants that hold when using a rollback
-** journal.  These invariants do not apply for journal_mode=WAL,
-** journal_mode=MEMORY, or journal_mode=OFF.
+** This comment block describes invariants that hold when using a rollback				该注释块描述使用一个回滚日志时的不变量。
+** journal.  These invariants do not apply for journal_mode=WAL,						这些不变量并不要求journal_mode=WAL，
+** journal_mode=MEMORY, or journal_mode=OFF.											journal_mode=MEMORY, or journal_mode=OFF.
 **
-** Within this comment block, a page is deemed to have been synced
-** automatically as soon as it is written when PRAGMA synchronous=OFF.
-** Otherwise, the page is not synced until the xSync method of the VFS
+** Within this comment block, a page is deemed to have been synced						当PRAGMA synchronous=OFF时，一个page一被写就认为已经完成了自动同步
+** automatically as soon as it is written when PRAGMA synchronous=OFF.					
+** Otherwise, the page is not synced until the xSync method of the VFS					否则，该page直到VFS的xSync方法被成功在包含了该page的文件上调用才被同步。
 ** is called successfully on the file containing the page.
 **
-** Definition:  A page of the database file is said to be "overwriteable" if
-** one or more of the following are true about the page:
+** Definition:  A page of the database file is said to be "overwriteable" if			定义：如果一个或多个下述的内容对page而言为真，
+** one or more of the following are true about the page:										那么这个page被称为是"overwriteable"
 ** 
-**     (a)  The original content of the page as it was at the beginning of
+**     (a)  The original content of the page as it was at the beginning of			·	(a) page最初的内容
 **          the transaction has been written into the rollback journal and
 **          synced.
 ** 
