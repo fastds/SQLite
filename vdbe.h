@@ -20,7 +20,7 @@
 #include <stdio.h>
 
 /*
-** A single VDBE is an opaque structure named "Vdbe".  Only routines 一个VDBE是一个讲座“Vdbe”不透明的结构体,只有在源文件sqliteVdbe.c中的函数被允许看到其内部结构
+** A single VDBE is an opaque structure named "Vdbe".  Only routines 		\\一个VDBE是一个名为“Vdbe”不透明的结构体,只有在源文件sqliteVdbe.c中的函数被允许看到其内部结构
 ** in the source file sqliteVdbe.c are allowed to see the insides
 ** of this structure.
 */
@@ -30,41 +30,41 @@ typedef struct Vdbe Vdbe;
 ** The names of the following types declared in vdbeInt.h are required 以下类型名，在vdbeInt.h中声明来进行VdbeOp定义
 ** for the VdbeOp definition.
 */
-typedef struct VdbeFunc VdbeFunc;
-typedef struct Mem Mem;			//用于存储各个类型的单独的值？ 
-typedef struct SubProgram SubProgram;
+typedef struct VdbeFunc VdbeFunc;									//Vdbe函数结构体
+typedef struct Mem Mem;												//用于存储各种类型的定义
+typedef struct SubProgram SubProgram;								//子程序结构体
 
 /*
-** A single instruction of the virtual machine has an opcode
+** A single instruction of the virtual machine has an opcode		//一个单独的指令,由一个操作码和三个操作数构成。
 ** and as many as three operands.  The instruction is recorded
 ** as an instance of the following structure:
 */
 struct VdbeOp {
-  u8 opcode;          /* What operation to perform */
-  signed char p4type; /* One of the P4_xxx constants for p4 */
-  u8 opflags;         /* Mask of the OPFLG_* flags in opcodes.h */
-  u8 p5;              /* Fifth parameter is an unsigned character */
-  int p1;             /* First operand */
-  int p2;             /* Second parameter (often the jump destination) */
-  int p3;             /* The third parameter */
-  union {             /* fourth parameter */
-    int i;                 /* Integer value if p4type==P4_INT32 */
-    void *p;               /* Generic pointer */
-    char *z;               /* Pointer to data for string (char array) types */
-    i64 *pI64;             /* Used when p4type is P4_INT64 */
+  u8 opcode;          /* What operation to perform */							//执行的操作
+  signed char p4type; /* One of the P4_xxx constants for p4 */					//P4_xxx常量中的一个
+  u8 opflags;         /* Mask of the OPFLG_* flags in opcodes.h */				//OPFLG_*标记的掩码(定义在opcodes.h中)
+  u8 p5;              /* Fifth parameter is an unsigned character */			//第五个操作数是一个无符号字符
+  int p1;             /* First operand */										//第一个操作数
+  int p2;             /* Second parameter (often the jump destination) */		//第二个操作数，通常是跳转目的地
+  int p3;             /* The third parameter */									//第三个操作数
+  union {             /* fourth parameter */									//第四个操作数，表示的内容见union内部
+    int i;                 /* Integer value if p4type==P4_INT32 */				//如果 p4type==P4_INT32，为Integer值
+    void *p;               /* Generic pointer */								//通用指针
+    char *z;               /* Pointer to data for string (char array) types */	//指向string类型的数据
+    i64 *pI64;             /* Used when p4type is P4_INT64 */					//p4type为P4_INT64时候使用。
     double *pReal;         /* Used when p4type is P4_REAL */
-    FuncDef *pFunc;        /* Used when p4type is P4_FUNCDEF */
+    FuncDef *pFunc;        /* Used when p4type is P4_FUNCDEF */					//p4type为P4_VDBEFUNC时候使用。(功能函数)
     VdbeFunc *pVdbeFunc;   /* Used when p4type is P4_VDBEFUNC */
     CollSeq *pColl;        /* Used when p4type is P4_COLLSEQ */
     Mem *pMem;             /* Used when p4type is P4_MEM */
     VTable *pVtab;         /* Used when p4type is P4_VTAB */
     KeyInfo *pKeyInfo;     /* Used when p4type is P4_KEYINFO */
-    int *ai;               /* Used when p4type is P4_INTARRAY */
-    SubProgram *pProgram;  /* Used when p4type is P4_SUBPROGRAM */
+    int *ai;               /* Used when p4type is P4_INTARRAY */				//p4type为P4_INTARRAY（引用变量）时使用
+    SubProgram *pProgram;  /* Used when p4type is P4_SUBPROGRAM */				//表示操作数是子程序
     int (*xAdvance)(BtCursor *, int *);
   } p4;
 #ifdef SQLITE_DEBUG
-  char *zComment;          /* Comment to improve readability */
+  char *zComment;          /* Comment to improve readability */					
 #endif
 #ifdef VDBE_PROFILE
   int cnt;                 /* Number of times this instruction was executed */
@@ -75,21 +75,21 @@ typedef struct VdbeOp VdbeOp;
 
 
 /*
-** A sub-routine used to implement a trigger program.
+** A sub-routine used to implement a trigger program.									//被用来实现一个触发器程序的子程序
 */
 struct SubProgram {
-  VdbeOp *aOp;                  /* Array of opcodes for sub-program */
-  int nOp;                      /* Elements in aOp[] */
-  int nMem;                     /* Number of memory cells required */
-  int nCsr;                     /* Number of cursors required */
-  int nOnce;                    /* Number of OP_Once instructions */
-  void *token;                  /* id that may be used to recursive triggers */
-  SubProgram *pNext;            /* Next sub-program already visited */
+  VdbeOp *aOp;                  /* Array of opcodes for sub-program */					//命令数组构成的子程序
+  int nOp;                      /* Elements in aOp[] */									//指令数
+  int nMem;                     /* Number of memory cells required */					//需要的内存单元数
+  int nCsr;                     /* Number of cursors required */					·	//需要的游标数
+  int nOnce;                    /* Number of OP_Once instructions */					//OP_Once指令数
+  void *token;                  /* id that may be used to recursive triggers */			//可能被用于循环触发的id
+  SubProgram *pNext;            /* Next sub-program already visited */					//
 };
 
 /*
-** A smaller version of VdbeOp used for the VdbeAddOpList() function because
-** it takes up less space.
+** A smaller version of VdbeOp used for the VdbeAddOpList() function because			//一个更小的VdbeOp的版本，被用于VdbeAddOpList()函数
+** it takes up less space.																//因为它占据更小的内存空间
 */
 struct VdbeOpList {
   u8 opcode;          /* What operation to perform */
@@ -100,7 +100,7 @@ struct VdbeOpList {
 typedef struct VdbeOpList VdbeOpList;
 
 /*
-** Allowed values of VdbeOp.p4type
+** Allowed values of VdbeOp.p4type													//VdbeOp.p4type的可用值
 */
 #define P4_NOTUSED    0   /* The P4 parameter is not used */
 #define P4_DYNAMIC  (-1)  /* Pointer to a string obtained from sqliteMalloc() */
@@ -116,9 +116,9 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_REAL     (-12) /* P4 is a 64-bit floating point value */
 #define P4_INT64    (-13) /* P4 is a 64-bit signed integer */
 #define P4_INT32    (-14) /* P4 is a 32-bit signed integer */
-#define P4_INTARRAY (-15) /* P4 is a vector of 32-bit integers */
+#define P4_INTARRAY (-15) /* P4 is a vector of 32-bit integers */					//32-bit integers的向量
 #define P4_SUBPROGRAM  (-18) /* P4 is a pointer to a SubProgram structure */
-#define P4_ADVANCE  (-19) /* P4 is a pointer to BtreeNext() or BtreePrev() */
+#define P4_ADVANCE  (-19) /* P4 is a pointer to BtreeNext() or BtreePrev() */		//P4位一个指向BtreeNext() or BtreePrev()的指针
 
 /* When adding a P4 argument using P4_KEYINFO, a copy of the KeyInfo structure
 ** is made.  That copy is freed when the Vdbe is finalized.  But if the

@@ -22,8 +22,8 @@
 ** are invoked only from within xCreate and xConnect methods.
 */
 struct VtabCtx {
-  VTable *pVTable;    /* The virtual table being constructed */
-  Table *pTab;        /* The Table object to which the virtual table belongs */
+  VTable *pVTable;    /* The virtual table being constructed */							//被构建的虚表
+  Table *pTab;        /* The Table object to which the virtual table belongs */			//虚表所属的表
 };
 
 /*
@@ -32,7 +32,7 @@ struct VtabCtx {
 ** sqlite3_create_module_v2() interfaces.
 */
 static int createModule(
-  sqlite3 *db,                    /* Database in which module is registered */
+  sqlite3 *db,                    /* Database in which module is registered */		
   const char *zName,              /* Name assigned to this module */
   const sqlite3_module *pModule,  /* The definition of the module */
   void *pAux,                     /* Context pointer for xCreate/xConnect */

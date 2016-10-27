@@ -9,8 +9,8 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-** This file contains code used for creating, destroying, and populating
-** a VDBE (or an "sqlite3_stmt" as it is known to the outside world.)  Prior
+** This file contains code used for creating, destroying, and populating				//该文件包含了用来创建、销毁、装载VDBE(or an "sqlite3_stmt" as it is known to the outside world.)
+** a VDBE (or an "sqlite3_stmt" as it is known to the outside world.)  Prior			
 ** to version 2.8.7, all this code was combined into the vdbe.c source file.
 ** But that file was getting too big so this subroutines were split out.
 */
@@ -31,6 +31,10 @@ int sqlite3VdbeAddopTrace = 0;
 
 /*
 ** Create a new virtual database engine.
+	流程描述：
+	1、创建Vdbe实例p
+	2、关联p和对应的数据库连接db
+	3、将新创建的p添加到为db中的pVdbe双向链表中
 */
 Vdbe *sqlite3VdbeCreate(sqlite3 *db){
   Vdbe *p;
@@ -48,7 +52,7 @@ Vdbe *sqlite3VdbeCreate(sqlite3 *db){
 }
 
 /*
-** Remember the SQL string for a prepared statement.
+** Remember the SQL string for a prepared statement.			//保存SQL串到对应Vdbe->zSql域当中
 */
 void sqlite3VdbeSetSql(Vdbe *p, const char *z, int n, int isPrepareV2){
   assert( isPrepareV2==1 || isPrepareV2==0 );
@@ -62,7 +66,7 @@ void sqlite3VdbeSetSql(Vdbe *p, const char *z, int n, int isPrepareV2){
 }
 
 /*
-** Return the SQL associated with a prepared statement
+** Return the SQL associated with a prepared statement		//返回一个已经预编译了的语句的SQL文本
 */
 const char *sqlite3_sql(sqlite3_stmt *pStmt){
   Vdbe *p = (Vdbe *)pStmt;
@@ -70,7 +74,7 @@ const char *sqlite3_sql(sqlite3_stmt *pStmt){
 }
 
 /*
-** Swap all content between two VDBE structures.
+** Swap all content between two VDBE structures.			
 */
 void sqlite3VdbeSwap(Vdbe *pA, Vdbe *pB){
   Vdbe tmp, *pTmp;
@@ -92,9 +96,9 @@ void sqlite3VdbeSwap(Vdbe *pA, Vdbe *pB){
 
 #ifdef SQLITE_DEBUG
 /*
-** Turn tracing on or off
+** Turn tracing on or off   设置跟踪的开或关
 */
-void sqlite3VdbeTrace(Vdbe *p, FILE *trace){
+void sqlite3VdbeTrace(Vdbe *p, FILE *trace){		
   p->trace = trace;
 }
 #endif
