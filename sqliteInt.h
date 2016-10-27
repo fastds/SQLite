@@ -802,62 +802,62 @@ struct LookasideSlot {
 };
 
 /*
-** A hash table for function definitions.
+** A hash table for function definitions.								//函数定义的一个哈希表
 **
-** Hash each FuncDef structure into one of the FuncDefHash.a[] slots.
-** Collisions are on the FuncDef.pHash chain.
+** Hash each FuncDef structure into one of the FuncDefHash.a[] slots.	//对FuncDef结构体散列到FuncDefHash.a[]槽中的一个
+** Collisions are on the FuncDef.pHash chain.							//冲突的对象被放在FuncDef.pHash链中
 */
 struct FuncDefHash {
   FuncDef *a[23];       /* Hash table for functions */
 };
 
 /*
-** Each database connection is an instance of the following structure.
+** Each database connection is an instance of the following structure.				//数据库连接是sqlite3结构体的一个实例
 */
 struct sqlite3 {
-  sqlite3_vfs *pVfs;            /* OS Interface */
-  struct Vdbe *pVdbe;           /* List of active virtual machines */
-  CollSeq *pDfltColl;           /* The default collating sequence (BINARY) */
-  sqlite3_mutex *mutex;         /* Connection mutex */
-  Db *aDb;                      /* All backends */
-  int nDb;                      /* Number of backends currently in use */
-  int flags;                    /* Miscellaneous flags. See below */
-  i64 lastRowid;                /* ROWID of most recent insert (see above) */
-  unsigned int openFlags;       /* Flags passed to sqlite3_vfs.xOpen() */
-  int errCode;                  /* Most recent error code (SQLITE_*) */
-  int errMask;                  /* & result codes with this before returning */
-  u8 autoCommit;                /* The auto-commit flag. */
-  u8 temp_store;                /* 1: file 2: memory 0: default */
-  u8 mallocFailed;              /* True if we have seen a malloc failure */
-  u8 dfltLockMode;              /* Default locking-mode for attached dbs */
-  signed char nextAutovac;      /* Autovac setting after VACUUM if >=0 */
-  u8 suppressErr;               /* Do not issue error messages if true */
-  u8 vtabOnConflict;            /* Value to return for s3_vtab_on_conflict() */
-  u8 isTransactionSavepoint;    /* True if the outermost savepoint is a TS */
-  int nextPagesize;             /* Pagesize after VACUUM if >0 */
-  u32 magic;                    /* Magic number for detect library misuse */
-  int nChange;                  /* Value returned by sqlite3_changes() */
-  int nTotalChange;             /* Value returned by sqlite3_total_changes() */
-  int aLimit[SQLITE_N_LIMIT];   /* Limits */
-  struct sqlite3InitInfo {      /* Information used during initialization */
-    int newTnum;                /* Rootpage of table being initialized */
-    u8 iDb;                     /* Which db file is being initialized */
-    u8 busy;                    /* TRUE if currently initializing */
-    u8 orphanTrigger;           /* Last statement is orphaned TEMP trigger */
+  sqlite3_vfs *pVfs;            /* OS Interface */									//OS接口(virtual file system)
+  struct Vdbe *pVdbe;           /* List of active virtual machines */				//VM列表
+  CollSeq *pDfltColl;           /* The default collating sequence (BINARY) */		//默认的对照/排序序列(BINARY)
+  sqlite3_mutex *mutex;         /* Connection mutex */								//连接互斥结构
+  Db *aDb;                      /* All backends */									//所有的后端
+  int nDb;                      /* Number of backends currently in use */			//当前使用的后端号
+  int flags;                    /* Miscellaneous flags. See below */				//各种各样的标记，见下述内容
+  i64 lastRowid;                /* ROWID of most recent insert (see above) */		//最近插入的ROWID
+  unsigned int openFlags;       /* Flags passed to sqlite3_vfs.xOpen() */			//传给sqlite3_vfs.xOpen()的标记
+  int errCode;                  /* Most recent error code (SQLITE_*) */				//最新的错误码(SQLITE_*)
+  int errMask;                  /* & result codes with this before returning */		//在返回前的&的结果码
+  u8 autoCommit;                /* The auto-commit flag. */							//自动提交标记
+  u8 temp_store;                /* 1: file 2: memory 0: default */					//1：文件 2：内存 0：默认
+  u8 mallocFailed;              /* True if we have seen a malloc failure */			//内存分配失败标记
+  u8 dfltLockMode;              /* Default locking-mode for attached dbs */			//附着的数据库的默认锁模式
+  signed char nextAutovac;      /* Autovac setting after VACUUM if >=0 */			//如果大于0，在VACUUM指示设置
+  u8 suppressErr;               /* Do not issue error messages if true */			//为真的话不报告错误消息
+  u8 vtabOnConflict;            /* Value to return for s3_vtab_on_conflict() */		//s3_vtab_on_conflict()的返回值
+  u8 isTransactionSavepoint;    /* True if the outermost savepoint is a TS */		//
+  int nextPagesize;             /* Pagesize after VACUUM if >0 */					//大于0表示VACUUM后的页面大小
+  u32 magic;                    /* Magic number for detect library misuse */		//
+  int nChange;                  /* Value returned by sqlite3_changes() */			//sqlite3_changes()返回值
+  int nTotalChange;             /* Value returned by sqlite3_total_changes() */		//sqlite3_total_changes()返回值
+  int aLimit[SQLITE_N_LIMIT];   /* Limits */										//限制
+  struct sqlite3InitInfo {      /* Information used during initialization */		//初始化过程中用到的信息
+    int newTnum;                /* Rootpage of table being initialized */			//被初始化的表的根页面
+    u8 iDb;                     /* Which db file is being initialized */			//指示哪个db文件被初始化
+    u8 busy;                    /* TRUE if currently initializing */				//当前正在初始化为true
+    u8 orphanTrigger;           /* Last statement is orphaned TEMP trigger */		//上一个语句是孤行TEMP触发器
   } init;
-  int activeVdbeCnt;            /* Number of VDBEs currently executing */
-  int writeVdbeCnt;             /* Number of active VDBEs that are writing */
-  int vdbeExecCnt;              /* Number of nested calls to VdbeExec() */
-  int nExtension;               /* Number of loaded extensions */
-  void **aExtension;            /* Array of shared library handles */
-  void (*xTrace)(void*,const char*);        /* Trace function */
-  void *pTraceArg;                          /* Argument to the trace function */
-  void (*xProfile)(void*,const char*,u64);  /* Profiling function */
-  void *pProfileArg;                        /* Argument to profile function */
-  void *pCommitArg;                 /* Argument to xCommitCallback() */   
-  int (*xCommitCallback)(void*);    /* Invoked at every commit. */
-  void *pRollbackArg;               /* Argument to xRollbackCallback() */   
-  void (*xRollbackCallback)(void*); /* Invoked at every commit. */
+  int activeVdbeCnt;            /* Number of VDBEs currently executing */			//当前执行的VDBEs数量
+  int writeVdbeCnt;             /* Number of active VDBEs that are writing */		//活动的处于写状态的VDBEs数量
+  int vdbeExecCnt;              /* Number of nested calls to VdbeExec() */			//循环/嵌套调用VdbeExec()数
+  int nExtension;               /* Number of loaded extensions */					//被加载的扩展数
+  void **aExtension;            /* Array of shared library handles */				//共享库句柄数组
+  void (*xTrace)(void*,const char*);        /* Trace function */					//跟踪函数
+  void *pTraceArg;                          /* Argument to the trace function */	//跟踪函数的参数
+  void (*xProfile)(void*,const char*,u64);  /* Profiling function */				//设置/剖析函数
+  void *pProfileArg;                        /* Argument to profile function */		//设置/剖析函数的参数
+  void *pCommitArg;                 /* Argument to xCommitCallback() */   			// xCommitCallback()的参数
+  int (*xCommitCallback)(void*);    /* Invoked at every commit. */					//在每次提交的时候被调用的函数
+  void *pRollbackArg;               /* Argument to xRollbackCallback() */   		//xRollbackCallback()的参数
+  void (*xRollbackCallback)(void*); /* Invoked at every commit. */					//在每次提交的时候被调用的函数
   void *pUpdateArg;
   void (*xUpdateCallback)(void*,int, const char*,const char*,sqlite_int64);
 #ifndef SQLITE_OMIT_WAL
@@ -867,18 +867,18 @@ struct sqlite3 {
   void(*xCollNeeded)(void*,sqlite3*,int eTextRep,const char*);
   void(*xCollNeeded16)(void*,sqlite3*,int eTextRep,const void*);
   void *pCollNeededArg;
-  sqlite3_value *pErr;          /* Most recent error message */
-  char *zErrMsg;                /* Most recent error message (UTF-8 encoded) */
-  char *zErrMsg16;              /* Most recent error message (UTF-16 encoded) */
+  sqlite3_value *pErr;          /* Most recent error message */						//最新错误消息
+  char *zErrMsg;                /* Most recent error message (UTF-8 encoded) */		//最新错误消息(UTF-8 encoded)
+  char *zErrMsg16;              /* Most recent error message (UTF-16 encoded) */	//最新错误消息(UTF-16 encoded)
   union {
-    volatile int isInterrupted; /* True if sqlite3_interrupt has been called */
+    volatile int isInterrupted; /* True if sqlite3_interrupt has been called */	·	//如果sqlite3_interrupt被调用，为真
     double notUsed1;            /* Spacer */
   } u1;
-  Lookaside lookaside;          /* Lookaside malloc configuration */
+  Lookaside lookaside;          /* Lookaside malloc configuration */				//后备内存分配配置
 #ifndef SQLITE_OMIT_AUTHORIZATION
   int (*xAuth)(void*,int,const char*,const char*,const char*,const char*);
-                                /* Access authorization function */
-  void *pAuthArg;               /* 1st argument to the access auth function */
+                                /* Access authorization function */					//访问授权函数
+  void *pAuthArg;               /* 1st argument to the access auth function */		//访问授权函数参数列表
 #endif
 #ifndef SQLITE_OMIT_PROGRESS_CALLBACK
   int (*xProgress)(void *);     /* The progress callback */
@@ -893,130 +893,130 @@ struct sqlite3 {
   VTable *pDisconnect;    /* Disconnect these in next sqlite3_prepare() */
 #endif
   FuncDefHash aFunc;            /* Hash table of connection functions */
-  Hash aCollSeq;                /* All collating sequences */
+  Hash aCollSeq;                /* All collating sequences */						//排序次序/排序序列
   BusyHandler busyHandler;      /* Busy callback */
   Db aDbStatic[2];              /* Static space for the 2 default backends */
-  Savepoint *pSavepoint;        /* List of active savepoints */
+  Savepoint *pSavepoint;        /* List of active savepoints */						//活动的保存点列表
   int busyTimeout;              /* Busy handler timeout, in msec */
   int nSavepoint;               /* Number of non-transaction savepoints */
-  int nStatement;               /* Number of nested statement-transactions  */
-  i64 nDeferredCons;            /* Net deferred constraints this transaction. */
-  int *pnBytesFreed;            /* If not NULL, increment this in DbFree() */
+  int nStatement;               /* Number of nested statement-transactions  */		//
+  i64 nDeferredCons;            /* Net deferred constraints this transaction. */	//
+  int *pnBytesFreed;            /* If not NULL, increment this in DbFree() */		//
 
 #ifdef SQLITE_ENABLE_UNLOCK_NOTIFY
-  /* The following variables are all protected by the STATIC_MASTER 
-  ** mutex, not by sqlite3.mutex. They are used by code in notify.c. 
+  /* The following variables are all protected by the STATIC_MASTER 				//以下变量全部收STATIC_MASTER 锁保护，而非STATIC_MASTER。
+  ** mutex, not by sqlite3.mutex. They are used by code in notify.c. 				//他们在notify.c中被使用
   **
-  ** When X.pUnlockConnection==Y, that means that X is waiting for Y to
+  ** When X.pUnlockConnection==Y, that means that X is waiting for Y to				//X.pUnlockConnection==Y,表示X正在等待Y的解锁，以便能够执行。
   ** unlock so that it can proceed.
   **
-  ** When X.pBlockingConnection==Y, that means that something that X tried
-  ** tried to do recently failed with an SQLITE_LOCKED error due to locks
+  ** When X.pBlockingConnection==Y, that means that something that X tried			//X.pBlockingConnection==Y,表示X试图获取锁失败(SQLITE_LOCKED error)，
+  ** tried to do recently failed with an SQLITE_LOCKED error due to locks			//因为Y持有锁
   ** held by Y.
   */
-  sqlite3 *pBlockingConnection; /* Connection that caused SQLITE_LOCKED */
-  sqlite3 *pUnlockConnection;           /* Connection to watch for unlock */
-  void *pUnlockArg;                     /* Argument to xUnlockNotify */
-  void (*xUnlockNotify)(void **, int);  /* Unlock notify callback */
-  sqlite3 *pNextBlocked;        /* Next in list of all blocked connections */
+  sqlite3 *pBlockingConnection; /* Connection that caused SQLITE_LOCKED */			//造成SQLITE_LOCKED的连接
+  sqlite3 *pUnlockConnection;           /* Connection to watch for unlock */		//等待锁释放的连接
+  void *pUnlockArg;                     /* Argument to xUnlockNotify */				//xUnlockNotify的参数
+  void (*xUnlockNotify)(void **, int);  /* Unlock notify callback */				//释放锁通知回调
+  sqlite3 *pNextBlocked;        /* Next in list of all blocked connections */		//所有阻塞连接的列表的next
 #endif
 };
 
 /*
-** A macro to discover the encoding of a database.
+** A macro to discover the encoding of a database.									//查看一个数据库编码的宏
 */
 #define ENC(db) ((db)->aDb[0].pSchema->enc)
 
 /*
-** Possible values for the sqlite3.flags.
+** Possible values for the sqlite3.flags.											//sqlite3.flags的可能的值（4 Bytes）
 */
 #define SQLITE_VdbeTrace      0x00000100  /* True to trace VDBE execution */
-#define SQLITE_InternChanges  0x00000200  /* Uncommitted Hash table changes */
-#define SQLITE_FullColNames   0x00000400  /* Show full column names on SELECT */
-#define SQLITE_ShortColNames  0x00000800  /* Show short columns names */
-#define SQLITE_CountRows      0x00001000  /* Count rows changed by INSERT, */
+#define SQLITE_InternChanges  0x00000200  /* Uncommitted Hash table changes */		//未提交的哈希表的改变
+#define SQLITE_FullColNames   0x00000400  /* Show full column names on SELECT */	//显示SELECT *上的完整的列名
+#define SQLITE_ShortColNames  0x00000800  /* Show short columns names */			//显示短列名
+#define SQLITE_CountRows      0x00001000  /* Count rows changed by INSERT, */		//被INSERT、DELETE或者UPDATE改变的行的计数，并用一个回调函数返回该计数
                                           /*   DELETE, or UPDATE and return */
                                           /*   the count using a callback. */
-#define SQLITE_NullCallback   0x00002000  /* Invoke the callback once if the */
+#define SQLITE_NullCallback   0x00002000  /* Invoke the callback once if the */		//如果结果集为空，调用一次毁掉函数
                                           /*   result set is empty */
-#define SQLITE_SqlTrace       0x00004000  /* Debug print SQL as it executes */
-#define SQLITE_VdbeListing    0x00008000  /* Debug listings of VDBE programs */
-#define SQLITE_WriteSchema    0x00010000  /* OK to update SQLITE_MASTER */
+#define SQLITE_SqlTrace       0x00004000  /* Debug print SQL as it executes */		//执行时调试打印SQL
+#define SQLITE_VdbeListing    0x00008000  /* Debug listings of VDBE programs */		//调试VDBE程序列表
+#define SQLITE_WriteSchema    0x00010000  /* OK to update SQLITE_MASTER */			//OK to 更新SQLITE_MASTER
                          /*   0x00020000  Unused */
-#define SQLITE_IgnoreChecks   0x00040000  /* Do not enforce check constraints */
-#define SQLITE_ReadUncommitted 0x0080000  /* For shared-cache mode */
-#define SQLITE_LegacyFileFmt  0x00100000  /* Create new databases in format 1 */
+#define SQLITE_IgnoreChecks   0x00040000  /* Do not enforce check constraints */	//不执行检查约束
+#define SQLITE_ReadUncommitted 0x0080000  /* For shared-cache mode */				//共享缓存模式
+#define SQLITE_LegacyFileFmt  0x00100000  /* Create new databases in format 1 */	//
 #define SQLITE_FullFSync      0x00200000  /* Use full fsync on the backend */
 #define SQLITE_CkptFullFSync  0x00400000  /* Use full fsync for checkpoint */
 #define SQLITE_RecoveryMode   0x00800000  /* Ignore schema errors */
 #define SQLITE_ReverseOrder   0x01000000  /* Reverse unordered SELECTs */
 #define SQLITE_RecTriggers    0x02000000  /* Enable recursive triggers */
-#define SQLITE_ForeignKeys    0x04000000  /* Enforce foreign key constraints  */
+#define SQLITE_ForeignKeys    0x04000000  /* Enforce foreign key constraints  */	//执行外键约束
 #define SQLITE_AutoIndex      0x08000000  /* Enable automatic indexes */
-#define SQLITE_PreferBuiltin  0x10000000  /* Preference to built-in funcs */
-#define SQLITE_LoadExtension  0x20000000  /* Enable load_extension */
-#define SQLITE_EnableTrigger  0x40000000  /* True to enable triggers */
+#define SQLITE_PreferBuiltin  0x10000000  /* Preference to built-in funcs */		//内建功能函数优先
+#define SQLITE_LoadExtension  0x20000000  /* Enable load_extension */				//启用加载扩展
+#define SQLITE_EnableTrigger  0x40000000  /* True to enable triggers */				//true表示启用触发器
 
 /*
-** Bits of the sqlite3.flags field that are used by the
-** sqlite3_test_control(SQLITE_TESTCTRL_OPTIMIZATIONS,...) interface.
-** These must be the low-order bits of the flags field.
+** Bits of the sqlite3.flags field that are used by the						·		//sqlite3.flags 域的位被用于
+** sqlite3_test_control(SQLITE_TESTCTRL_OPTIMIZATIONS,...) interface.				//sqlite3_test_control(SQLITE_TESTCTRL_OPTIMIZATIONS,...)接口
+** These must be the low-order bits of the flags field.								//这些必须是flags域低位的位
 */
-#define SQLITE_QueryFlattener 0x01        /* Disable query flattening */
-#define SQLITE_ColumnCache    0x02        /* Disable the column cache */
-#define SQLITE_IndexSort      0x04        /* Disable indexes for sorting */
-#define SQLITE_IndexSearch    0x08        /* Disable indexes for searching */
-#define SQLITE_IndexCover     0x10        /* Disable index covering table */
-#define SQLITE_GroupByOrder   0x20        /* Disable GROUPBY cover of ORDERBY */
-#define SQLITE_FactorOutConst 0x40        /* Disable factoring out constants */
+#define SQLITE_QueryFlattener 0x01        /* Disable query flattening */			//关闭查询扁平化
+#define SQLITE_ColumnCache    0x02        /* Disable the column cache */			//关闭列缓存
+#define SQLITE_IndexSort      0x04        /* Disable indexes for sorting */			//关闭索引排序
+#define SQLITE_IndexSearch    0x08        /* Disable indexes for searching */		//关闭索引查找
+#define SQLITE_IndexCover     0x10        /* Disable index covering table */		//
+#define SQLITE_GroupByOrder   0x20        /* Disable GROUPBY cover of ORDERBY */	//
+#define SQLITE_FactorOutConst 0x40        /* Disable factoring out constants */		//析出因数常量
 #define SQLITE_IdxRealAsInt   0x80        /* Store REAL as INT in indices */
 #define SQLITE_DistinctOpt    0x80        /* DISTINCT using indexes */
-#define SQLITE_OptMask        0xff        /* Mask of all disablable opts */
+#define SQLITE_OptMask        0xff        /* Mask of all disablable opts */			//所有选项的掩码
 
 /*
-** Possible values for the sqlite.magic field.
-** The numbers are obtained at random and have no special meaning, other
+** Possible values for the sqlite.magic field.										//sqlite.magic域的可能值
+** The numbers are obtained at random and have no special meaning, other			//包含的随机码无特别含义，仅示区分
 ** than being distinct from one another.
 */
-#define SQLITE_MAGIC_OPEN     0xa029a697  /* Database is open */
-#define SQLITE_MAGIC_CLOSED   0x9f3c2d33  /* Database is closed */
-#define SQLITE_MAGIC_SICK     0x4b771290  /* Error and awaiting close */
-#define SQLITE_MAGIC_BUSY     0xf03b7906  /* Database currently in use */
-#define SQLITE_MAGIC_ERROR    0xb5357930  /* An SQLITE_MISUSE error occurred */
-#define SQLITE_MAGIC_ZOMBIE   0x64cffc7f  /* Close with last statement close */
+#define SQLITE_MAGIC_OPEN     0xa029a697  /* Database is open */					//数据库为打开状态
+#define SQLITE_MAGIC_CLOSED   0x9f3c2d33  /* Database is closed */					//数据库被关闭
+#define SQLITE_MAGIC_SICK     0x4b771290  /* Error and awaiting close */			//发生错误，并等待关闭
+#define SQLITE_MAGIC_BUSY     0xf03b7906  /* Database currently in use */			//数据库正被使用
+#define SQLITE_MAGIC_ERROR    0xb5357930  /* An SQLITE_MISUSE error occurred */		//发生SQLITE_MISUSE 错误
+#define SQLITE_MAGIC_ZOMBIE   0x64cffc7f  /* Close with last statement close */		//
 
 /*
-** Each SQL function is defined by an instance of the following
-** structure.  A pointer to this structure is stored in the sqlite.aFunc
-** hash table.  When multiple functions have the same name, the hash table
+** Each SQL function is defined by an instance of the following						//每一个SQL function由FuncDef结构体定义
+** structure.  A pointer to this structure is stored in the sqlite.aFunc			//一个指针指向被存储在sqlite.aFunc哈希表中的该结构体
+** hash table.  When multiple functions have the same name, the hash table			//当有多个functions同名，哈希表指向一个存储这些结构体的链表
 ** points to a linked list of these structures.
 */
 struct FuncDef {
-  i16 nArg;            /* Number of arguments.  -1 means unlimited */
-  u8 iPrefEnc;         /* Preferred text encoding (SQLITE_UTF8, 16LE, 16BE) */
-  u8 flags;            /* Some combination of SQLITE_FUNC_* */
-  void *pUserData;     /* User data parameter */
-  FuncDef *pNext;      /* Next function with same name */
-  void (*xFunc)(sqlite3_context*,int,sqlite3_value**); /* Regular function */
-  void (*xStep)(sqlite3_context*,int,sqlite3_value**); /* Aggregate step */
-  void (*xFinalize)(sqlite3_context*);                /* Aggregate finalizer */
-  char *zName;         /* SQL name of the function. */
-  FuncDef *pHash;      /* Next with a different name but the same hash */
-  FuncDestructor *pDestructor;   /* Reference counted destructor function */
+  i16 nArg;            /* Number of arguments.  -1 means unlimited */				//参数数量，-1表示无限制
+  u8 iPrefEnc;         /* Preferred text encoding (SQLITE_UTF8, 16LE, 16BE) */		//首选的文本编码(SQLITE_UTF8, 16LE, 16BE) 
+  u8 flags;            /* Some combination of SQLITE_FUNC_* */						//SQLITE_FUNC_*的某种组合设置
+  void *pUserData;     /* User data parameter */									//用户数据参数
+  FuncDef *pNext;      /* Next function with same name */							//同名的下一个function
+  void (*xFunc)(sqlite3_context*,int,sqlite3_value**); /* Regular function */		//正则函数
+  void (*xStep)(sqlite3_context*,int,sqlite3_value**); /* Aggregate step */			//
+  void (*xFinalize)(sqlite3_context*);                /* Aggregate finalizer */		//聚集函数终止器
+  char *zName;         /* SQL name of the function. */								//function的SQL名
+  FuncDef *pHash;      /* Next with a different name but the same hash */			//具有相同哈希值但名称不同的NEXT
+  FuncDestructor *pDestructor;   /* Reference counted destructor function */		//计数析构函数引用
 };
 
 /*
-** This structure encapsulates a user-function destructor callback (as
-** configured using create_function_v2()) and a reference counter. When
-** create_function_v2() is called to create a function with a destructor,
-** a single object of this type is allocated. FuncDestructor.nRef is set to 
-** the number of FuncDef objects created (either 1 or 3, depending on whether
-** or not the specified encoding is SQLITE_ANY). The FuncDef.pDestructor
+** This structure encapsulates a user-function destructor callback (as				//该结构封装一个用户自定义析构器回调函数（由create_function_v2()配置）
+** configured using create_function_v2()) and a reference counter. When				//和一个引用计数器。当create_function_v2()被调用来创建一个
+** create_function_v2() is called to create a function with a destructor,			//带有析构器的函数,则分配一个该类型的对象
+** a single object of this type is allocated. FuncDestructor.nRef is set to 		//FuncDestructor.nRef被设置为被创建的FuncDef对象的数量(1或者3，取决于是否声明了编码是SQLITE_ANY)
+** the number of FuncDef objects created (either 1 or 3, depending on whether		
+** or not the specified encoding is SQLITE_ANY). The FuncDef.pDestructor			//每一个新的FuncDef对象的FuncDef.pDestructor成员被设置来指向已分配的FuncDestructor
 ** member of each of the new FuncDef objects is set to point to the allocated
 ** FuncDestructor.
 **
-** Thereafter, when one of the FuncDef objects is deleted, the reference
-** count on this object is decremented. When it reaches 0, the destructor
+** Thereafter, when one of the FuncDef objects is deleted, the reference			//其后，当FuncDef对象中的一个被删除，这个对象的引用递减。
+** count on this object is decremented. When it reaches 0, the destructor			//当递减到0时，析构器被调用并且FuncDestructor结构体被释放
 ** is invoked and the FuncDestructor structure freed.
 */
 struct FuncDestructor {
@@ -1101,72 +1101,72 @@ struct Savepoint {
 
 
 /*
-** Each SQLite module (virtual table definition) is defined by an
-** instance of the following structure, stored in the sqlite3.aModule
+** Each SQLite module (virtual table definition) is defined by an				//每个FuncDestructor模块（虚表定义）定义为Module结构体，存储于
+** instance of the following structure, stored in the sqlite3.aModule			//sqlite3.aModule哈希表中
 ** hash table.
 */
 struct Module {
-  const sqlite3_module *pModule;       /* Callback pointers */
-  const char *zName;                   /* Name passed to create_module() */
-  void *pAux;                          /* pAux passed to create_module() */
-  void (*xDestroy)(void *);            /* Module destructor function */
+  const sqlite3_module *pModule;       /* Callback pointers */					//回调指针
+  const char *zName;                   /* Name passed to create_module() */		//传给create_module()的名称
+  void *pAux;                          /* pAux passed to create_module() */		//传给create_module()的pAux(附加信息)
+  void (*xDestroy)(void *);            /* Module destructor function */			//该结构体的析构器
 };
 
 /*
-** information about each column of an SQL table is held in an instance
+** information about each column of an SQL table is held in an instance			//SQL表中的每一列的信息保存在该结构体中
 ** of this structure.
 */
 struct Column {
   char *zName;     /* Name of this column */
-  Expr *pDflt;     /* Default value of this column */
-  char *zDflt;     /* Original text of the default value */
+  Expr *pDflt;     /* Default value of this column */							//该列默认值
+  char *zDflt;     /* Original text of the default value */						//默认值的初始文本
   char *zType;     /* Data type for this column */
-  char *zColl;     /* Collating sequence.  If NULL, use the default */
-  u8 notNull;      /* True if there is a NOT NULL constraint */
-  u8 isPrimKey;    /* True if this column is part of the PRIMARY KEY */
-  char affinity;   /* One of the SQLITE_AFF_... values */
+  char *zColl;     /* Collating sequence.  If NULL, use the default */			//排序次序
+  u8 notNull;      /* True if there is a NOT NULL constraint */					//true ，如果有一个非空约束
+  u8 isPrimKey;    /* True if this column is part of the PRIMARY KEY */			//如果是主键的而一部分为真
+  char affinity;   /* One of the SQLITE_AFF_... values */						//SQLITE_AFF_...值的其中之一（类型亲和性）
 #ifndef SQLITE_OMIT_VIRTUALTABLE
-  u8 isHidden;     /* True if this column is 'hidden' */
+  u8 isHidden;     /* True if this column is 'hidden' */						//判别该列是否'hidden'
 #endif
 };
 
 /*
-** A "Collating Sequence" is defined by an instance of the following
-** structure. Conceptually, a collating sequence consists of a name and
-** a comparison routine that defines the order of that sequence.
+** A "Collating Sequence" is defined by an instance of the following			//一个"Collating Sequence" 定义为CollSeq结构体
+** structure. Conceptually, a collating sequence consists of a name and			//概念上来讲，一个排序序列由一个名字和一个对比函数构成
+** a comparison routine that defines the order of that sequence.				//这个对比函数定义了该序列的排序规则
 **
-** There may two separate implementations of the collation function, one
-** that processes text in UTF-8 encoding (CollSeq.xCmp) and another that
-** processes text encoded in UTF-16 (CollSeq.xCmp16), using the machine
+** There may two separate implementations of the collation function, one		//对于排序函数，可能有两个不同的实现，一个以UTF-8 encoding处理文本(CollSeq.xCmp)
+** that processes text in UTF-8 encoding (CollSeq.xCmp) and another that		//另一个用UTF-16 处理文本(CollSeq.xCmp16)，用本地的字节序。
+** processes text encoded in UTF-16 (CollSeq.xCmp16), using the machine			//当一个排序序列被调用，如果有的话，SQLite选择编码转化开销最小的版本
 ** native byte order. When a collation sequence is invoked, SQLite selects
 ** the version that will require the least expensive encoding
 ** translations, if any.
 **
-** The CollSeq.pUser member variable is an extra parameter that passed in
+** The CollSeq.pUser member variable is an extra parameter that passed in		//
 ** as the first argument to the UTF-8 comparison function, xCmp.
 ** CollSeq.pUser16 is the equivalent for the UTF-16 comparison function,
 ** xCmp16.
 **
-** If both CollSeq.xCmp and CollSeq.xCmp16 are NULL, it means that the
-** collating sequence is undefined.  Indices built on an undefined
+** If both CollSeq.xCmp and CollSeq.xCmp16 are NULL, it means that the			//如果CollSeq.xCmp 、 CollSeq.xCmp16 都为NULL
+** collating sequence is undefined.  Indices built on an undefined				//表示排序顺序未定义。构建在一个未定义的排序顺序上的索引可能无法被读写
 ** collating sequence may not be read or written.
 */
 struct CollSeq {
   char *zName;          /* Name of the collating sequence, UTF-8 encoded */
   u8 enc;               /* Text encoding handled by xCmp() */
-  void *pUser;          /* First argument to xCmp() */
+  void *pUser;          /* First argument to xCmp() */							//xCmp()的第一个参数
   int (*xCmp)(void*,int, const void*, int, const void*);
-  void (*xDel)(void*);  /* Destructor for pUser */
+  void (*xDel)(void*);  /* Destructor for pUser */								//pUser析构器
 };
 
 /*
-** A sort order can be either ASC or DESC.
+** A sort order can be either ASC or DESC.										//排序方式。0：升序排序	1：降序排序
 */
 #define SQLITE_SO_ASC       0  /* Sort in ascending order */
 #define SQLITE_SO_DESC      1  /* Sort in ascending order */
 
 /*
-** Column affinity types.
+** Column affinity types.														//列的亲和性类型
 **
 ** These used to have mnemonic name like 'i' for SQLITE_AFF_INTEGER and
 ** 't' for SQLITE_AFF_TEXT.  But we can save a little space and improve
@@ -1191,10 +1191,10 @@ struct CollSeq {
 ** The SQLITE_AFF_MASK values masks off the significant bits of an
 ** affinity value. 
 */
-#define SQLITE_AFF_MASK     0x67
+#define SQLITE_AFF_MASK     0x67					//0110 0111
 
 /*
-** Additional bit values that can be ORed with an affinity without
+** Additional bit values that can be ORed(或运算) with an affinity without			以下位可以与亲和性类型进行或运算，这种运算不改变列类型的亲和性
 ** changing the affinity.
 */
 #define SQLITE_JUMPIFNULL   0x08  /* jumps if either operand is NULL */
@@ -1239,18 +1239,18 @@ struct CollSeq {
 ** explanation as to why it is safe to add an entry to an sqlite3.pDisconnect
 ** list without holding the corresponding sqlite3.mutex mutex.
 **
-** The memory for objects of this type is always allocated by 
-** sqlite3DbMalloc(), using the connection handle stored in VTable.db as 
+** The memory for objects of this type is always allocated by 						//该对象的内存总是有sqlite3DbMalloc()分配
+** sqlite3DbMalloc(), using the connection handle stored in VTable.db as 			//用存储在VTable.db中的连接句柄作为第一个参数
 ** the first argument.
 */
 struct VTable {
-  sqlite3 *db;              /* Database connection associated with this table */
-  Module *pMod;             /* Pointer to module implementation */
-  sqlite3_vtab *pVtab;      /* Pointer to vtab instance */
-  int nRef;                 /* Number of pointers to this structure */
-  u8 bConstraint;           /* True if constraints are supported */
+  sqlite3 *db;              /* Database connection associated with this table */	//与该表关联的数据库连接
+  Module *pMod;             /* Pointer to module implementation */					//指向module实现的指针
+  sqlite3_vtab *pVtab;      /* Pointer to vtab instance */							//指向vtab实例的指针
+  int nRef;                 /* Number of pointers to this structure */				//该结构体的引用数量
+  u8 bConstraint;           /* True if constraints are supported */					//true ,if  支持约束
   int iSavepoint;           /* Depth of the SAVEPOINT stack */
-  VTable *pNext;            /* Next in linked list (see above) */
+  VTable *pNext;            /* Next in linked list (see above) */					//链表的下一个
 };
 
 /*
@@ -1284,43 +1284,43 @@ struct VTable {
 ** of a SELECT statement.
 */
 struct Table {
-  char *zName;         /* Name of the table or view */
-  int iPKey;           /* If not negative, use aCol[iPKey] as the primary key */
-  int nCol;            /* Number of columns in this table */
-  Column *aCol;        /* Information about each column */
-  Index *pIndex;       /* List of SQL indexes on this table. */
-  int tnum;            /* Root BTree node for this table (see note above) */
-  tRowcnt nRowEst;     /* Estimated rows in table - from sqlite_stat1 table */
-  Select *pSelect;     /* NULL for tables.  Points to definition if a view. */
-  u16 nRef;            /* Number of pointers to this Table */
-  u8 tabFlags;         /* Mask of TF_* values */
-  u8 keyConf;          /* What to do in case of uniqueness conflict on iPKey */
-  FKey *pFKey;         /* Linked list of all foreign keys in this table */
-  char *zColAff;       /* String defining the affinity of each column */
-#ifndef SQLITE_OMIT_CHECK
-  ExprList *pCheck;    /* All CHECK constraints */
+  char *zName;         /* Name of the table or view */									//表/视图的名字
+  int iPKey;           /* If not negative, use aCol[iPKey] as the primary key */		//非负，用aCol[iPKey]作为主键，即为主键列的索引号
+  int nCol;            /* Number of columns in this table */							//表的列数
+  Column *aCol;        /* Information about each column */								//表的列信息
+  Index *pIndex;       /* List of SQL indexes on this table. */							//表的索引信息
+  int tnum;            /* Root BTree node for this table (see note above) */			//该表的BTree的根节点
+  tRowcnt nRowEst;     /* Estimated rows in table - from sqlite_stat1 table */			//
+  Select *pSelect;     /* NULL for tables.  Points to definition if a view. */			//对于表，它为NULL。指向一个视图的定义
+  u16 nRef;            /* Number of pointers to this Table */							//该表的引用数
+  u8 tabFlags;         /* Mask of TF_* values */										//TF_* 掩码值
+  u8 keyConf;          /* What to do in case of uniqueness conflict on iPKey */			//当iPkey发生唯一性冲突的解决策略
+  FKey *pFKey;         /* Linked list of all foreign keys in this table */				//表的外键链表
+  char *zColAff;       /* String defining the affinity of each column */				//定义了每一个列的亲和性，为一个字符串
+#ifndef SQLITE_OMIT_CHECK											
+  ExprList *pCheck;    /* All CHECK constraints */										//所有的检查约束
 #endif
 #ifndef SQLITE_OMIT_ALTERTABLE
-  int addColOffset;    /* Offset in CREATE TABLE stmt to add a new column */
-#endif
+  int addColOffset;    /* Offset in CREATE TABLE stmt to add a new column */			//CREATE TABLE stmt中添加新列时的偏移量
+#endif				
 #ifndef SQLITE_OMIT_VIRTUALTABLE
-  VTable *pVTable;     /* List of VTable objects. */
-  int nModuleArg;      /* Number of arguments to the module */
-  char **azModuleArg;  /* Text of all module args. [0] is module name */
+  VTable *pVTable;     /* List of VTable objects. */									//VTable对象列表
+  int nModuleArg;      /* Number of arguments to the module */							//module参数数
+  char **azModuleArg;  /* Text of all module args. [0] is module name */				//[0] is module name ,所有module参数的文本
 #endif
-  Trigger *pTrigger;   /* List of triggers stored in pSchema */
-  Schema *pSchema;     /* Schema that contains this table */
-  Table *pNextZombie;  /* Next on the Parse.pZombieTab list */
+  Trigger *pTrigger;   /* List of triggers stored in pSchema */							//存储在pSchema中的触发器列表
+  Schema *pSchema;     /* Schema that contains this table */							//包含该表的schema信息
+  Table *pNextZombie;  /* Next on the Parse.pZombieTab list */							//Parse.pZombieTab 列表中的下一个
 };
 
 /*
-** Allowed values for Tabe.tabFlags.
+** Allowed values for Tabe.tabFlags.												//Tabe.tabFlags的允许值
 */
-#define TF_Readonly        0x01    /* Read-only system table */
-#define TF_Ephemeral       0x02    /* An ephemeral table */
-#define TF_HasPrimaryKey   0x04    /* Table has a primary key */
-#define TF_Autoincrement   0x08    /* Integer primary key is autoincrement */
-#define TF_Virtual         0x10    /* Is a virtual table */
+#define TF_Readonly        0x01    /* Read-only system table */						//只读系统表
+#define TF_Ephemeral       0x02    /* An ephemeral table */							//临时表
+#define TF_HasPrimaryKey   0x04    /* Table has a primary key */					//表由主键
+#define TF_Autoincrement   0x08    /* Integer primary key is autoincrement */		//表整型ID是自增长的
+#define TF_Virtual         0x10    /* Is a virtual table */							//是一个虚表
 
 
 /*
@@ -1337,9 +1337,9 @@ struct Table {
 #endif
 
 /*
-** Each foreign key constraint is an instance of the following structure.
+** Each foreign key constraint is an instance of the following structure.			//外键约束 结构体---> FKey
 **
-** A foreign key is associated with two tables.  The "from" table is
+** A foreign key is associated with two tables.  The "from" table is				//
 ** the table that contains the REFERENCES clause that creates the foreign
 ** key.  The "to" table is the table that is named in the REFERENCES clause.
 ** Consider this example:
@@ -1356,24 +1356,24 @@ struct Table {
 ** the from-table is created.  The existence of the to-table is not checked.
 */
 struct FKey {
-  Table *pFrom;     /* Table containing the REFERENCES clause (aka: Child) */
-  FKey *pNextFrom;  /* Next foreign key in pFrom */
-  char *zTo;        /* Name of table that the key points to (aka: Parent) */
-  FKey *pNextTo;    /* Next foreign key on table named zTo */
-  FKey *pPrevTo;    /* Previous foreign key on table named zTo */
-  int nCol;         /* Number of columns in this key */
+  Table *pFrom;     /* Table containing the REFERENCES clause (aka: Child) */		//包含REFERENCES字句的表
+  FKey *pNextFrom;  /* Next foreign key in pFrom */									//pFrom的下一个外键
+  char *zTo;        /* Name of table that the key points to (aka: Parent) */		//将该外键作为键的表的名称
+  FKey *pNextTo;    /* Next foreign key on table named zTo */						//名称为zTo的表的下一个外键
+  FKey *pPrevTo;    /* Previous foreign key on table named zTo */					//名称为zTo的表的上一个外键
+  int nCol;         /* Number of columns in this key */								//这个外键包含的列数
   /* EV: R-30323-21917 */
-  u8 isDeferred;    /* True if constraint checking is deferred till COMMIT */
-  u8 aAction[2];          /* ON DELETE and ON UPDATE actions, respectively */
-  Trigger *apTrigger[2];  /* Triggers for aAction[] actions */
-  struct sColMap {  /* Mapping of columns in pFrom to columns in zTo */
-    int iFrom;         /* Index of column in pFrom */
-    char *zCol;        /* Name of column in zTo.  If 0 use PRIMARY KEY */
-  } aCol[1];        /* One entry for each of nCol column s */
+  u8 isDeferred;    /* True if constraint checking is deferred till COMMIT */		//当约束检查推迟到提交时，为true
+  u8 aAction[2];          /* ON DELETE and ON UPDATE actions, respectively */		//分别表示DELETE操作、UPDATE操作中的应用
+  Trigger *apTrigger[2];  /* Triggers for aAction[] actions */						//aAction[]的触发器
+  struct sColMap {  /* Mapping of columns in pFrom to columns in zTo */				//pFrom中的列到zTo中的列的映射
+    int iFrom;         /* Index of column in pFrom */								//pFrom的列的索引
+    char *zCol;        /* Name of column in zTo.  If 0 use PRIMARY KEY */			//zTo中的列的名称。 如果为0，则使用PRIMARY KEY
+  } aCol[1];        /* One entry for each of nCol column s */						//映射关系(只有一个)
 };
 
 /*
-** SQLite supports many different ways to resolve a constraint
+** SQLite supports many different ways to resolve a constraint						//SQLite支持多种方法来解决约束检查时产生的错误
 ** error.  ROLLBACK processing means that a constraint violation
 ** causes the operation in process to fail and for the current transaction
 ** to be rolled back.  ABORT processing means the operation in process
@@ -1416,108 +1416,110 @@ struct FKey {
 ** An instance of the following structure is passed as the first
 ** argument to sqlite3VdbeKeyCompare and is used to control the 
 ** comparison of the two index keys.
+	KeyInfo结构体的实例作为第一个参数被传给sqlite3VdbeKeyCompare
+	并且没用于控制两个索引键的对比
 */
 struct KeyInfo {
-  sqlite3 *db;        /* The database connection */
-  u8 enc;             /* Text encoding - one of the SQLITE_UTF* values */
-  u16 nField;         /* Number of entries in aColl[] */
-  u8 *aSortOrder;     /* Sort order for each column.  May be NULL */
-  CollSeq *aColl[1];  /* Collating sequence for each term of the key */
+  sqlite3 *db;        /* The database connection */							
+  u8 enc;             /* Text encoding - one of the SQLITE_UTF* values */	//SQLITE_UTF* values中的其中一个
+  u16 nField;         /* Number of entries in aColl[] */					//aColl[]中entries数
+  u8 *aSortOrder;     /* Sort order for each column.  May be NULL */		//每一个列的排序方式，肯能为NULL
+  CollSeq *aColl[1];  /* Collating sequence for each term of the key */		//这个key的每一项的排列顺序
 };
 
 /*
 ** An instance of the following structure holds information about a
 ** single index record that has already been parsed out into individual
-** values.
+** values.																	//UnpackedRecord表示已经被解析的一条记录
 **
-** A record is an object that contains one or more fields of data.
-** Records are used to store the content of a table row and to store
-** the key of an index.  A blob encoding of a record is created by
-** the OP_MakeRecord opcode of the VDBE and is disassembled by the
+** A record is an object that contains one or more fields of data.			//一条记录包含很多域
+** Records are used to store the content of a table row and to store		//这些记录被用来存储表中行的内容，也存储一个索引键。
+** the key of an index.  A blob encoding of a record is created by			//一条二进制编码的记录，由VDBE的OP_MakeRecord操作码创建
+** the OP_MakeRecord opcode of the VDBE and is disassembled by the			//由OP_Column操作码解析
 ** OP_Column opcode.
 **
-** This structure holds a record that has already been disassembled
+** This structure holds a record that has already been disassembled			//该结构体保存的是一条已经解析为它的组成域的记录
 ** into its constituent fields.
 */
 struct UnpackedRecord {
-  KeyInfo *pKeyInfo;  /* Collation and sort-order information */
-  u16 nField;         /* Number of entries in apMem[] */
-  u8 flags;           /* Boolean settings.  UNPACKED_... below */
-  i64 rowid;          /* Used by UNPACKED_PREFIX_SEARCH */
-  Mem *aMem;          /* Values */
+  KeyInfo *pKeyInfo;  /* Collation and sort-order information */			//排序信息
+  u16 nField;         /* Number of entries in apMem[] */					//apMem[]中的entry数
+  u8 flags;           /* Boolean settings.  UNPACKED_... below */			//下述的UNPACKED_...标记
+  i64 rowid;          /* Used by UNPACKED_PREFIX_SEARCH */					//被UNPACKED_PREFIX_SEARCH使用
+  Mem *aMem;          /* Values */											//记录的值列表
 };
 
 /*
-** Allowed values of UnpackedRecord.flags
+** Allowed values of UnpackedRecord.flags										//UnpackedRecord.flags的可用取值
 */
-#define UNPACKED_INCRKEY       0x01  /* Make this key an epsilon larger */
-#define UNPACKED_PREFIX_MATCH  0x02  /* A prefix match is considered OK */
-#define UNPACKED_PREFIX_SEARCH 0x04  /* Ignore final (rowid) field */
+#define UNPACKED_INCRKEY       0x01  /* Make this key an epsilon larger */		//
+#define UNPACKED_PREFIX_MATCH  0x02  /* A prefix match is considered OK */		//前缀匹配
+#define UNPACKED_PREFIX_SEARCH 0x04  /* Ignore final (rowid) field */			//忽略最后的字段 (rowid) 
 
 /*
-** Each SQL index is represented in memory by an
+** Each SQL index is represented in memory by an								//Index结构体表示一个SQL索引对象
 ** instance of the following structure.
 **
-** The columns of the table that are to be indexed are described
-** by the aiColumn[] field of this structure.  For example, suppose
+** The columns of the table that are to be indexed are described				//表中被索引的列号被描述为Index结构体的aiColumn[]域，
+** by the aiColumn[] field of this structure.  For example, suppose				//例如，有以下表和索引：
 ** we have the following table and index:
 **
-**     CREATE TABLE Ex1(c1 int, c2 int, c3 text);
+**     CREATE TABLE Ex1(c1 int, c2 int, c3 text);				
 **     CREATE INDEX Ex2 ON Ex1(c3,c1);
 **
-** In the Table structure describing Ex1, nCol==3 because there are
-** three columns in the table.  In the Index structure describing
-** Ex2, nColumn==2 since 2 of the 3 columns of Ex1 are indexed.
-** The value of aiColumn is {2, 0}.  aiColumn[0]==2 because the 
-** first column to be indexed (c3) has an index of 2 in Ex1.aCol[].
-** The second column to be indexed (c1) has an index of 0 in
-** Ex1.aCol[], hence Ex2.aiColumn[1]==0.
+** In the Table structure describing Ex1, nCol==3 because there are				//表Ex1中，nCol==3.
+** three columns in the table.  In the Index structure describing				//在Index的描述Ex2中，nColumn==2.因为3列当中
+** Ex2, nColumn==2 since 2 of the 3 columns of Ex1 are indexed.					//有2列被索引
+** The value of aiColumn is {2, 0}.  aiColumn[0]==2 because the 				//aiColumn的值是 {2, 0}。2是因为
+** first column to be indexed (c3) has an index of 2 in Ex1.aCol[].				//被索引的第一列（c3）由一个索引2在Ex1.aCol[]中。
+** The second column to be indexed (c1) has an index of 0 in					//被索引的第二列(c1)由一个索引0在Ex1.aCol[]中。
+** Ex1.aCol[], hence Ex2.aiColumn[1]==0.										//因此Ex2.aiColumn[1]==0
 **
-** The Index.onError field determines whether or not the indexed columns
-** must be unique and what to do if they are not.  When Index.onError=OE_None,
-** it means this is not a unique index.  Otherwise it is a unique index
-** and the value of Index.onError indicate the which conflict resolution 
-** algorithm to employ whenever an attempt is made to insert a non-unique
+** The Index.onError field determines whether or not the indexed columns		//Index.onError field用来确定是否被索引的列必须唯一，
+** must be unique and what to do if they are not.  When Index.onError=OE_None,	//并且在不唯一时该做什么。当Index.onError=OE_None时，
+** it means this is not a unique index.  Otherwise it is a unique index			//表示是一个可以不唯一的索引。否则就是唯一索引，
+** and the value of Index.onError indicate the which conflict resolution 		//并且Index.onError的值指示当尝试插入一个不唯一的元素时部署哪个冲突解决算法
+** algorithm to employ whenever an attempt is made to insert a non-unique		//
 ** element.
 */
 struct Index {
-  char *zName;     /* Name of this index */
-  int *aiColumn;   /* Which columns are used by this index.  1st is 0 */
-  tRowcnt *aiRowEst; /* Result of ANALYZE: Est. rows selected by each column */
-  Table *pTable;   /* The SQL table being indexed */
-  char *zColAff;   /* String defining the affinity of each column */
-  Index *pNext;    /* The next index associated with the same table */
-  Schema *pSchema; /* Schema containing this index */
-  u8 *aSortOrder;  /* Array of size Index.nColumn. True==DESC, False==ASC */
-  char **azColl;   /* Array of collation sequence names for index */
-  int nColumn;     /* Number of columns in the table used by this index */
-  int tnum;        /* Page containing root of this index in database file */
-  u8 onError;      /* OE_Abort, OE_Ignore, OE_Replace, or OE_None */
-  u8 autoIndex;    /* True if is automatically created (ex: by UNIQUE) */
-  u8 bUnordered;   /* Use this index for == or IN queries only */
+  char *zName;     /* Name of this index */										//索引名
+  int *aiColumn;   /* Which columns are used by this index.  1st is 0 */		//索引所对应的所在表中的列标号
+  tRowcnt *aiRowEst; /* Result of ANALYZE: Est. rows selected by each column */	//分析结果：
+  Table *pTable;   /* The SQL table being indexed */							//被索引的表
+  char *zColAff;   /* String defining the affinity of each column */			//每一列的列亲和性的字符串定义
+  Index *pNext;    /* The next index associated with the same table */			//关联表的下一个索引
+  Schema *pSchema; /* Schema containing this index */							//包含当前index的模式
+  u8 *aSortOrder;  /* Array of size Index.nColumn. True==DESC, False==ASC */	//Index.nColumn中每一项的排序方式 True==DESC, False==ASC
+  char **azColl;   /* Array of collation sequence names for index */			//索引的collation sequence名称
+  int nColumn;     /* Number of columns in the table used by this index */		//表中被索引的列数
+  int tnum;        /* Page containing root of this index in database file */	//数据库文件中，包含了当前索引的根页面？
+  u8 onError;      /* OE_Abort, OE_Ignore, OE_Replace, or OE_None */			//取值：OE_Abort, OE_Ignore, OE_Replace, or OE_None
+  u8 autoIndex;    /* True if is automatically created (ex: by UNIQUE) */		//如果自动创建索引，为真（如通过UNIQUE）
+  u8 bUnordered;   /* Use this index for == or IN queries only */				//当查询中涉及了当前索引的== 或者 IN操作时，才使用
 #ifdef SQLITE_ENABLE_STAT3
-  int nSample;             /* Number of elements in aSample[] */
+  int nSample;             /* Number of elements in aSample[] */				//*aSamples数组的大小
   tRowcnt avgEq;           /* Average nEq value for key values not in aSample */
-  IndexSample *aSample;    /* Samples of the left-most key */
+  IndexSample *aSample;    /* Samples of the left-most key */					//最左边的key的sample
 #endif
 };
 
 /*
-** Each sample stored in the sqlite_stat3 table is represented in memory 
-** using a structure of this type.  See documentation at the top of the
+** Each sample stored in the sqlite_stat3 table is represented in memory 			//sqlite_stat3中存储了IndexSample类型结构体
+** using a structure of this type.  See documentation at the top of the				//见analyze.c源文件文档的顶部的额外信息
 ** analyze.c source file for additional information.
 */
 struct IndexSample {
   union {
-    char *z;        /* Value if eType is SQLITE_TEXT or SQLITE_BLOB */
-    double r;       /* Value if eType is SQLITE_FLOAT */
+    char *z;        /* Value if eType is SQLITE_TEXT or SQLITE_BLOB */				//
+    double r;       /* Value if eType is SQLITE_FLOAT */							//
     i64 i;          /* Value if eType is SQLITE_INTEGER */
   } u;
-  u8 eType;         /* SQLITE_NULL, SQLITE_INTEGER ... etc. */
-  int nByte;        /* Size in byte of text or blob. */
-  tRowcnt nEq;      /* Est. number of rows where the key equals this sample */
-  tRowcnt nLt;      /* Est. number of rows where key is less than this sample */
-  tRowcnt nDLt;     /* Est. number of distinct keys less than this sample */
+  u8 eType;         /* SQLITE_NULL, SQLITE_INTEGER ... etc. */					
+  int nByte;        /* Size in byte of text or blob. */								//text或blob的字节数
+  tRowcnt nEq;      /* Est. number of rows where the key equals this sample */		//key等于当前sample的行数
+  tRowcnt nLt;      /* Est. number of rows where key is less than this sample */	//key＜当前sample的行数
+  tRowcnt nDLt;     /* Est. number of distinct keys less than this sample */		//＜当前sample的不同的key数
 };
 
 /*
