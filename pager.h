@@ -62,7 +62,7 @@ typedef struct PgHdr DbPage;	//页面处理类型
 ** Allowed values for the flags parameter to sqlite3PagerOpen().
 **
 ** NOTE: These values must match the corresponding BTREE_ values in btree.h.
-** 允许sqlite3PagerOpen()的标志参数的值。注意:这些值必须匹配相应的在btree.h BTREE值。
+** sqlite3PagerOpen()的标志参数的可选值。注意:这些值必须匹配在btree.h BTREE的对应值。
 */
 #define PAGER_OMIT_JOURNAL  0x0001    /* Do not use a rollback journal */			//不使用回滚日志
 #define PAGER_MEMORY        0x0002    /* In-memory database */						//内存数据库
@@ -78,13 +78,13 @@ typedef struct PgHdr DbPage;	//页面处理类型
 /*
 ** Numeric constants that encode the journalmode.  
 */
-#define PAGER_JOURNALMODE_QUERY     (-1)  /* Query the value of journalmode */
-#define PAGER_JOURNALMODE_DELETE      0   /* Commit by deleting journal file */
-#define PAGER_JOURNALMODE_PERSIST     1   /* Commit by zeroing journal header */
-#define PAGER_JOURNALMODE_OFF         2   /* Journal omitted.  */
+#define PAGER_JOURNALMODE_QUERY     (-1)  /* Query the value of journalmode */		//查询journalmode的值
+#define PAGER_JOURNALMODE_DELETE      0   /* Commit by deleting journal file */		//由删除日志文件提交
+#define PAGER_JOURNALMODE_PERSIST     1   /* Commit by zeroing journal header */	
+#define PAGER_JOURNALMODE_OFF         2   /* Journal omitted.  */					//关闭日志功能
 #define PAGER_JOURNALMODE_TRUNCATE    3   /* Commit by truncating journal */
-#define PAGER_JOURNALMODE_MEMORY      4   /* In-memory journal file */
-#define PAGER_JOURNALMODE_WAL         5   /* Use write-ahead logging */
+#define PAGER_JOURNALMODE_MEMORY      4   /* In-memory journal file */				//内存日志文件
+#define PAGER_JOURNALMODE_WAL         5   /* Use write-ahead logging */				//开启预写日志功能
 
 /*
 ** The remainder of this file contains the declarations of the functions

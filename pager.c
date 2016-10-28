@@ -13,7 +13,7 @@
 ** 
 ** The pager is used to access a database disk file.  It implements				//Pager被用于访问数据库磁盘文件。它通过使用
 ** atomic commit and rollback through the use of a journal file that			//独立于数据库文件的日志文件实现了原子提交和回滚
-** is separate from the database file.  The pager also implements file			//pager也实现了文件锁机制，以放置两个线程同时写相同的数据库文件、
+** is separate from the database file.  The pager also implements file			//pager也实现了文件锁机制，以防止两个线程同时写相同的数据库文件、
 ** locking to prevent two processes from writing the same database				//或防止一个线程去读另外一个正在被写的数据库
 ** file simultaneously, or one process from reading the database while
 ** another is writing.
@@ -37,80 +37,80 @@
 ** Definition:  A page of the database file is said to be "overwriteable" if			定义：如果一个或多个下述的内容对page而言为真，
 ** one or more of the following are true about the page:										那么这个page被称为是"overwriteable"
 ** 
-**     (a)  The original content of the page as it was at the beginning of			·	(a) page最初的内容
+**     (a)  The original content of the page as it was at the beginning of			·	(a)  page最初的内容，事务开始时被写入回滚日志并同步
 **          the transaction has been written into the rollback journal and
 **          synced.
 ** 
-**     (b)  The page was a freelist leaf page at the start of the transaction.
+**     (b)  The page was a freelist leaf page at the start of the transaction.			(b)  在事务的开始，page 是一个 freelist 叶子页面
 ** 
-**     (c)  The page number is greater than the largest page that existed in
+**     (c)  The page number is greater than the largest page that existed in			(c)  在事务的开始，页面编号要比存在于数据库文件中的最大的页面大
 **          the database file at the start of the transaction.
 ** 
-** (1) A page of the database file is never overwritten unless one of the
-**     following are true:
+** (1) A page of the database file is never overwritten unless one of the			(1) 数据库文件的一个页面不会被覆写，除非它满足
+**     following are true:																
 ** 
-**     (a) The page and all other pages on the same sector are overwriteable.
+**     (a) The page and all other pages on the same sector are overwriteable.			(a) 页面和所有其他在相同扇区的页面是可覆写的。
 ** 
-**     (b) The atomic page write optimization is enabled, and the entire
-**         transaction other than the update of the transaction sequence
+**     (b) The atomic page write optimization is enabled, and the entire				(b) 原子页面写操作的优化被开启，并且整个事务(除了更新事务)
+**         transaction other than the update of the transaction sequence					序列号由一个单独的页面改变构成
 **         number consists of a single page change.
 ** 
-** (2) The content of a page written into the rollback journal exactly matches
-**     both the content in the database when the rollback journal was written
+** (2) The content of a page written into the rollback journal exactly matches		(2) 被写入回滚日志的页面的内容和回滚日志被覆写时数据库里面的内容以及
+**     both the content in the database when the rollback journal was written			在当前事务开始时数据库当中的内容保持一致。
 **     and the content in the database at the beginning of the current
 **     transaction.
 ** 
-** (3) Writes to the database file are an integer multiple of the page size
+** (3) Writes to the database file are an integer multiple of the page size			(3) 数据库文件写操作的长度是一个页面大小的整数倍，并对其页边界
 **     in length and are aligned on a page boundary.
 ** 
-** (4) Reads from the database file are either aligned on a page boundary and
-**     an integer multiple of the page size in length or are taken from the
+** (4) Reads from the database file are either aligned on a page boundary and		(4) 数据库文件的读操作要么对其页边界、大小为页面大小的整数倍，要么
+**     an integer multiple of the page size in length or are taken from the				取自数据库文件的头100个字节
 **     first 100 bytes of the database file.
 ** 
-** (5) All writes to the database file are synced prior to the rollback journal
+** (5) All writes to the database file are synced prior to the rollback journal		(5) 所有对数据库文件的写操作的同步要优先于回滚日志的删除、截断、调零操作
 **     being deleted, truncated, or zeroed.
 ** 
-** (6) If a master journal file is used, then all writes to the database file
-**     are synced prior to the master journal being deleted.
+** (6) If a master journal file is used, then all writes to the database file		(6) 如果一个master日志文件被使用，那么所有对数据库文件的写操作的同步
+**     are synced prior to the master journal being deleted.							优先于master日志的删除操作
 ** 
-** Definition: Two databases (or the same database at two points it time)
-** are said to be "logically equivalent" if they give the same answer to
-** all queries.  Note in particular the content of freelist leaf
-** pages can be changed arbitarily without effecting the logical equivalence
+** Definition: Two databases (or the same database at two points it time)			定义：两个数据库（）被称为“logically equivalent”，如果他们对所有的
+** are said to be "logically equivalent" if they give the same answer to			查询相同的相应。
+** all queries.  Note in particular the content of freelist leaf					要注意，特别是空闲列表(freelist)叶子页面的内容能够在没有影响
+** pages can be changed arbitarily without effecting the logical equivalence		logical equivalence数据库的情况下被任意改变
 ** of the database.
 ** 
-** (7) At any time, if any subset, including the empty set and the total set,
-**     of the unsynced changes to a rollback journal are removed and the 
-**     journal is rolled back, the resulting database file will be logical
+** (7) At any time, if any subset, including the empty set and the total set,		(7) 任何时候，如果任何的对一个回滚日志未同步修改内容的子集（包含空集和全集）被删除，
+**     of the unsynced changes to a rollback journal are removed and the 				这个日志被回滚，结果的数据库文件将是事务开始时的数据库文件的logically equivalent
+**     journal is rolled back, the resulting database file will be logical				
 **     equivalent to the database file at the beginning of the transaction.
 ** 
-** (8) When a transaction is rolled back, the xTruncate method of the VFS
-**     is called to restore the database file to the same size it was at
+** (8) When a transaction is rolled back, the xTruncate method of the VFS			(8) 当一个事务是回滚，VFS的xTruncate方法被调用来恢复数据库文件的大小为事务开始时的大小
+**     is called to restore the database file to the same size it was at				（在某些VFSes中，xTruncate方法什么事都不做，但是不会改变SQLite还是会调用它）
 **     the beginning of the transaction.  (In some VFSes, the xTruncate
 **     method is a no-op, but that does not change the fact the SQLite will
 **     invoke it.)
 ** 
-** (9) Whenever the database file is modified, at least one bit in the range
-**     of bytes from 24 through 39 inclusive will be changed prior to releasing
+** (9) Whenever the database file is modified, at least one bit in the range		(9) 无论何时数据库文件被修改，至少1 bit包含在24-39字节范围之中，该bit被有限改变去释放EXCLUSIVE
+**     of bytes from 24 through 39 inclusive will be changed prior to releasing			锁，给其他在相同数据库连接刷新它们的缓冲区。
 **     the EXCLUSIVE lock, thus signaling other connections on the same
 **     database to flush their caches.
 **
-** (10) The pattern of bits in bytes 24 through 39 shall not repeat in less
+** (10) The pattern of bits in bytes 24 through 39 shall not repeat in less			(10) 24-39的字节模式在十亿次事务内不得重复
 **      than one billion transactions.
 **
-** (11) A database file is well-formed at the beginning and at the conclusion
+** (11) A database file is well-formed at the beginning and at the conclusion		(11) 一个数据库文件在每一次事务的开始和结束时都是格式良好的
 **      of every transaction.
 **
-** (12) An EXCLUSIVE lock is held on the database file when writing to
-**      the database file.
+** (12) An EXCLUSIVE lock is held on the database file when writing to				(12) 当正在写一个数据库文件时，一个EXCLUSIVE锁被应用在数据库文件上
+**      the database file.		
 **
-** (13) A SHARED lock is held on the database file while reading any
+** (13) A SHARED lock is held on the database file while reading any				(13) 一个SHARE锁在对数据库文件内容进行读取时被持有
 **      content out of the database file.
 **
 ******************************************************************************/
 
 /*
-** Macros for troubleshooting.  Normally turned off
+** Macros for troubleshooting.  Normally turned off									//用于排错的宏，通常都是关闭的		
 */
 #if 0
 int sqlite3PagerTrace=1;  /* True to enable tracing */
@@ -121,19 +121,19 @@ int sqlite3PagerTrace=1;  /* True to enable tracing */
 #endif
 
 /*
-** The following two macros are used within the PAGERTRACE() macros above
-** to print out file-descriptors. 
+** The following two macros are used within the PAGERTRACE() macros above			//下述两个宏被用于上述PAGERTRACE() macros范围内
+** to print out file-descriptors. 													//用来打印文件描述符
 **
-** PAGERID() takes a pointer to a Pager struct as its argument. The
-** associated file-descriptor is returned. FILEHANDLEID() takes an sqlite3_file
-** struct as its argument.
+** PAGERID() takes a pointer to a Pager struct as its argument. The					//PAGERID()将一个Pager结构的指针作为它的参数。
+** associated file-descriptor is returned. FILEHANDLEID() takes an sqlite3_file		//与之相关的文件描述符被返回。FILEHANDLEID()
+** struct as its argument.															//将一个sqlite3_file结构作为其参数
 */
 #define PAGERID(p) ((int)(p->fd))
 #define FILEHANDLEID(fd) ((int)fd)
 
 /*
-** The Pager.eState variable stores the current 'state' of a pager. A
-** pager may be in any one of the seven states shown in the following
+** The Pager.eState variable stores the current 'state' of a pager. A				//Pager.eState变量存储在当前一个pager的'state'。
+** pager may be in any one of the seven states shown in the following				//一个pager处于在下面七个状态中的任何一个：
 ** state diagram.
 **
 **                            OPEN <------+------+
@@ -154,7 +154,7 @@ int sqlite3PagerTrace=1;  /* True to enable tracing */
 **               +<------WRITER_FINISHED-------->+
 **
 **
-** List of state transitions and the C [function] that performs each:
+** List of state transitions and the C [function] that performs each:				//状态事务列表和C函数的执行：
 ** 
 **   OPEN              -> READER              [sqlite3PagerSharedLock]
 **   READER            -> OPEN                [pager_unlock]
@@ -169,184 +169,184 @@ int sqlite3PagerTrace=1;  /* True to enable tracing */
 **   ERROR             -> OPEN                [pager_unlock]
 ** 
 **
-**  OPEN:
+**  OPEN:																			//OPEN：
 **
-**    The pager starts up in this state. Nothing is guaranteed in this
-**    state - the file may or may not be locked and the database size is
+**    The pager starts up in this state. Nothing is guaranteed in this				//Pager在该状态时启动。在该状态，不提供任何保证
+**    state - the file may or may not be locked and the database size is			//文件可能(不)被锁并且数据库的大小未知。数据库可能不被读写。
 **    unknown. The database may not be read or written.
 **
-**    * No read or write transaction is active.
-**    * Any lock, or no lock at all, may be held on the database file.
-**    * The dbSize, dbOrigSize and dbFileSize variables may not be trusted.
+**    * No read or write transaction is active.										//*	没有读/写事务在活动
+**    * Any lock, or no lock at all, may be held on the database file.				//*	数据库文件上可能有任何锁，或没有锁
+**    * The dbSize, dbOrigSize and dbFileSize variables may not be trusted.			//* dbSize，dbOrigSize和dbFileSIze变量可能不可信
 **
-**  READER:
+**  READER:																			//READER:	
 **
-**    In this state all the requirements for reading the database in 
-**    rollback (non-WAL) mode are met. Unless the pager is (or recently
-**    was) in exclusive-locking mode, a user-level read transaction is 
+**    In this state all the requirements for reading the database in 				//在该状态下，所有的在回滚模式下的数据库的读需求都能被满足
+**    rollback (non-WAL) mode are met. Unless the pager is (or recently				//除非pager是(或者最近曾是)exclusive-locking 模式，一个
+**    was) in exclusive-locking mode, a user-level read transaction is 				// user-level读事务打开。该状态下数据库大小已知
 **    open. The database size is known in this state.
 **
-**    A connection running with locking_mode=normal enters this state when
-**    it opens a read-transaction on the database and returns to state
-**    OPEN after the read-transaction is completed. However a connection
-**    running in locking_mode=exclusive (including temp databases) remains in
-**    this state even after the read-transaction is closed. The only way
-**    a locking_mode=exclusive connection can transition from READER to OPEN
-**    is via the ERROR state (see below).
+**    A connection running with locking_mode=normal enters this state when			//当在数据库上打开了一个read-transaction，一个连接运行在
+**    it opens a read-transaction on the database and returns to state				//locking_mode=normal下，并且在read-transaction完成时返回到OPEN状态。
+**    OPEN after the read-transaction is completed. However a connection			//但是一个连接运行在locking_mode=exclusive(包括临时数据库)下，即使
+**    running in locking_mode=exclusive (including temp databases) remains in		//read-transaction被关闭了之后依然维持该状态。
+**    this state even after the read-transaction is closed. The only way			//a locking_mode=exclusive连接从READER状态改变为OPEN状态的唯一方式
+**    a locking_mode=exclusive connection can transition from READER to OPEN		//是通过ERROR状态
+**    is via the ERROR state (see below).											
 ** 
-**    * A read transaction may be active (but a write-transaction cannot).
-**    * A SHARED or greater lock is held on the database file.
-**    * The dbSize variable may be trusted (even if a user-level read 
-**      transaction is not active). The dbOrigSize and dbFileSize variables
-**      may not be trusted at this point.
-**    * If the database is a WAL database, then the WAL connection is open.
-**    * Even if a read-transaction is not open, it is guaranteed that 
-**      there is no hot-journal in the file-system.
+**    * A read transaction may be active (but a write-transaction cannot).			//* 一个读事务可靠那个是活动的(but a write-transaction cannot)
+**    * A SHARED or greater lock is held on the database file.						//* 一个SHARE或者更大的锁被持有
+**    * The dbSize variable may be trusted (even if a user-level read 				//* dbSize变量可能可信（即使一个user-level读事务是不活动状态）。
+**      transaction is not active). The dbOrigSize and dbFileSize variables			//	dbOrigSize和dbFileSize变量可能在这个时候也不可信
+**      may not be trusted at this point.											
+**    * If the database is a WAL database, then the WAL connection is open.			//* 如果数据库是一个WAL数据库，WAL连接被打开。
+**    * Even if a read-transaction is not open, it is guaranteed that 				//* 即使一个read-transaction 未被打开，依然可以保证
+**      there is no hot-journal in the file-system.									//	文件系统中不存在hot-journal
 **
-**  WRITER_LOCKED:
+**  WRITER_LOCKED:																	//WRITER_LOCKED:
+**	
+**    The pager moves to this state from READER when a write-transaction			//当一个写交互在数据库中最先被打开，pager就会从READER状态
+**    is first opened on the database. In WRITER_LOCKED state, all locks 			//改变到当前状态，所有要求开始一个写事务的锁被持有，但是
+**    required to start a write-transaction are held, but no actual 				//缓存或者数据库占据的空间没有实际的改变
+**    modifications to the cache or database have taken place.						//
 **
-**    The pager moves to this state from READER when a write-transaction
-**    is first opened on the database. In WRITER_LOCKED state, all locks 
-**    required to start a write-transaction are held, but no actual 
-**    modifications to the cache or database have taken place.
-**
-**    In rollback mode, a RESERVED or (if the transaction was opened with 
-**    BEGIN EXCLUSIVE) EXCLUSIVE lock is obtained on the database file when
-**    moving to this state, but the journal file is not written to or opened 
+**    In rollback mode, a RESERVED or (if the transaction was opened with 			//在回滚模式下，一个RESERVED或者（如果事务由 BEGIN EXCLUSIVE打开）EXCLUSIVE
+**    BEGIN EXCLUSIVE) EXCLUSIVE lock is obtained on the database file when			//锁被数据库文件获得，则变为该状态，但是日志文件没有在这个状态被写入或者打开。
+**    moving to this state, but the journal file is not written to or opened 		//如果事务在WRITER_LOCKED状态被提交或回滚，所需要的做的就是释放数据库文件锁
 **    to in this state. If the transaction is committed or rolled back while 
 **    in WRITER_LOCKED state, all that is required is to unlock the database 
 **    file.
 **
-**    IN WAL mode, WalBeginWriteTransaction() is called to lock the log file.
-**    If the connection is running with locking_mode=exclusive, an attempt
-**    is made to obtain an EXCLUSIVE lock on the database file.
+**    IN WAL mode, WalBeginWriteTransaction() is called to lock the log file.		//在WAL模式下，WRITER_LOCKED()被调用来锁定日志文件。
+**    If the connection is running with locking_mode=exclusive, an attempt			//如果连接正在以locking_mode=exclusive运行，将尝试获得
+**    is made to obtain an EXCLUSIVE lock on the database file.						//数据库文件上的EXCLUSIVE锁
 **
-**    * A write transaction is active.
-**    * If the connection is open in rollback-mode, a RESERVED or greater 
-**      lock is held on the database file.
-**    * If the connection is open in WAL-mode, a WAL write transaction
-**      is open (i.e. sqlite3WalBeginWriteTransaction() has been successfully
+**    * A write transaction is active.												//* 一个写事务是活动的
+**    * If the connection is open in rollback-mode, a RESERVED or greater 			//* 如果连接在回滚模式下打开，一个RESERVE或者更大的锁
+**      lock is held on the database file.											//  作用于数据库文件上
+**    * If the connection is open in WAL-mode, a WAL write transaction				//* 如果连接在WAL-mode下被打开，一个WAL写事务便打开
+**      is open (i.e. sqlite3WalBeginWriteTransaction() has been successfully		// (如sqlite3WalBeginWriteTransaction()已经成功被调用)
 **      called).
-**    * The dbSize, dbOrigSize and dbFileSize variables are all valid.
-**    * The contents of the pager cache have not been modified.
-**    * The journal file may or may not be open.
-**    * Nothing (not even the first header) has been written to the journal.
+**    * The dbSize, dbOrigSize and dbFileSize variables are all valid.				//* dbSize，dbOrigSize和dbFileSize变量是全部有效的
+**    * The contents of the pager cache have not been modified.						//* pager缓冲区的内容未被修改。
+**    * The journal file may or may not be open.									//* 日志文件可能（未）打开。
+**    * Nothing (not even the first header) has been written to the journal.		//* 没有东西（甚至是第一个header）被写到日志中。
 **
-**  WRITER_CACHEMOD:
+**  WRITER_CACHEMOD:																//WRITER_CACHEMOD:
 **
-**    A pager moves from WRITER_LOCKED state to this state when a page is
-**    first modified by the upper layer. In rollback mode the journal file
-**    is opened (if it is not already open) and a header written to the
-**    start of it. The database file on disk has not been modified.
+**    A pager moves from WRITER_LOCKED state to this state when a page is			//当一个page第一次被上层修改，pager的状态从WRITER_LOCKED到当前状态
+**    first modified by the upper layer. In rollback mode the journal file			//在回滚模式下，日志文件被打开（如果未被打开）并且一个header被写
+**    is opened (if it is not already open) and a header written to the				//到它的起始处。磁盘上的数据库文件未被修改
+**    start of it. The database file on disk has not been modified.					
 **
-**    * A write transaction is active.
-**    * A RESERVED or greater lock is held on the database file.
-**    * The journal file is open and the first header has been written 
-**      to it, but the header has not been synced to disk.
-**    * The contents of the page cache have been modified.
+**    * A write transaction is active.												//* 一个写数据是活动的。
+**    * A RESERVED or greater lock is held on the database file.					//* 一个RESERVED或者更大的锁作用于数据库文件
+**    * The journal file is open and the first header has been written 				//* 日志文件是打开的并且第一个header被写入
+**      to it, but the header has not been synced to disk.							//	但是这个header并没有同步到磁盘
+**    * The contents of the page cache have been modified.							//* page缓冲区的内容已经被修改
 **
-**  WRITER_DBMOD:
+**  WRITER_DBMOD:																	//WRITER_DBMOD:
 **
-**    The pager transitions from WRITER_CACHEMOD into WRITER_DBMOD state
-**    when it modifies the contents of the database file. WAL connections
-**    never enter this state (since they do not modify the database file,
+**    The pager transitions from WRITER_CACHEMOD into WRITER_DBMOD state			//当pager修改的数据库文件的内容时，pager状态从
+**    when it modifies the contents of the database file. WAL connections			//WRITER_CACHEMOD转换到WRITER_DBMOD。WAL连接
+**    never enter this state (since they do not modify the database file,			//从不进入该状态（因为他们不修改数据库文件,只修改日志文件）
 **    just the log file).
 **
-**    * A write transaction is active.
-**    * An EXCLUSIVE or greater lock is held on the database file.
-**    * The journal file is open and the first header has been written 
-**      and synced to disk.
-**    * The contents of the page cache have been modified (and possibly
+**    * A write transaction is active.												//* 一个写事务是活动的
+**    * An EXCLUSIVE or greater lock is held on the database file.					//* 一个EXCLUSIVE锁或者更大的锁作用于数据库文件
+**    * The journal file is open and the first header has been written 				//* 日志文件处于打开状态并且第一个header被写且
+**      and synced to disk.															//	同步到磁盘
+**    * The contents of the page cache have been modified (and possibly				//* page缓冲区的内容被修改(可能被写到磁盘)
 **      written to disk).
 **
-**  WRITER_FINISHED:
+**  WRITER_FINISHED:																//WRITER_FINISHED:
 **
-**    It is not possible for a WAL connection to enter this state.
+**    It is not possible for a WAL connection to enter this state.					//WAL连接不会进入到此状态
 **
-**    A rollback-mode pager changes to WRITER_FINISHED state from WRITER_DBMOD
-**    state after the entire transaction has been successfully written into the
-**    database file. In this state the transaction may be committed simply
-**    by finalizing the journal file. Once in WRITER_FINISHED state, it is 
+**    A rollback-mode pager changes to WRITER_FINISHED state from WRITER_DBMOD		//一个回滚模式的pager在整个事务被成功写入到数据库文件之后
+**    state after the entire transaction has been successfully written into the		//状态从WRITER_DBMOD变为WRITER_FINISHED
+**    database file. In this state the transaction may be committed simply			//在这个交互状态可能被已完成的日志文件提交。一旦处于WRITER_FINISHED
+**    by finalizing the journal file. Once in WRITER_FINISHED state, it is 			//状态，数据库不可能再进一步被修改。这时，上层要么提交、要么回滚事务
 **    not possible to modify the database further. At this point, the upper 
 **    layer must either commit or rollback the transaction.
 **
-**    * A write transaction is active.
-**    * An EXCLUSIVE or greater lock is held on the database file.
-**    * All writing and syncing of journal and database data has finished.
-**      If no error occured, all that remains is to finalize the journal to
+**    * A write transaction is active.												//* 一个写交互是活动的。
+**    * An EXCLUSIVE or greater lock is held on the database file.					//* 一个EXCLUSIVE或者更大的锁作用于数据库文件
+**    * All writing and syncing of journal and database data has finished.			//* 所有的对日志的写操作和同步操作以及数据库数据已经结束
+**      If no error occured, all that remains is to finalize the journal to			
 **      commit the transaction. If an error did occur, the caller will need
 **      to rollback the transaction. 
 **
-**  ERROR:
+**  ERROR:																			//ERROR:
 **
-**    The ERROR state is entered when an IO or disk-full error (including
-**    SQLITE_IOERR_NOMEM) occurs at a point in the code that makes it 
+**    The ERROR state is entered when an IO or disk-full error (including			//IO or disk-full错误（包括SQLITE_IOERR_NOMEM）发生，进入ERROR状态
+**    SQLITE_IOERR_NOMEM) occurs at a point in the code that makes it 				//内存pager状态（cache 内容，db 大小等）难以确保和文件系统一致
 **    difficult to be sure that the in-memory pager state (cache contents, 
 **    db size etc.) are consistent with the contents of the file-system.
 **
-**    Temporary pager files may enter the ERROR state, but in-memory pagers
+**    Temporary pager files may enter the ERROR state, but in-memory pagers			//临时pager文件可能进入该状态，单内存pager不会
 **    cannot.
 **
-**    For example, if an IO error occurs while performing a rollback, 
-**    the contents of the page-cache may be left in an inconsistent state.
-**    At this point it would be dangerous to change back to READER state
-**    (as usually happens after a rollback). Any subsequent readers might
-**    report database corruption (due to the inconsistent cache), and if
+**    For example, if an IO error occurs while performing a rollback, 				//如，执行回滚时IO error发生，page-cache内容可能是不连续状态。
+**    the contents of the page-cache may be left in an inconsistent state.			//这时变回READER状态很危险。(通常发生于一个回滚操作之后)
+**    At this point it would be dangerous to change back to READER state		
+**    (as usually happens after a rollback). Any subsequent readers might			//任何后续的readers可能报告数据损坏(因为不连续的缓冲区)，并且如果
+**    report database corruption (due to the inconsistent cache), and if			//他们升级为writers，可能会无意中损坏数据库文件
 **    they upgrade to writers, they may inadvertently corrupt the database
-**    file. To avoid this hazard, the pager switches into the ERROR state
+**    file. To avoid this hazard, the pager switches into the ERROR state			//为了避免这样的危险情况，pager转换为ERROR状态而非跟随这样的错误的READER状态
 **    instead of READER following such an error.
 **
-**    Once it has entered the ERROR state, any attempt to use the pager
-**    to read or write data returns an error. Eventually, once all 
-**    outstanding transactions have been abandoned, the pager is able to
+**    Once it has entered the ERROR state, any attempt to use the pager				//一旦进入ERROR状态，任何试图使用pager进行数据读写的操作返回一个错误。最终，
+**    to read or write data returns an error. Eventually, once all 					//所有其他运行无误的事务被丢弃，pager能够转换会OPEN状态，丢弃page-cache中的内容
+**    outstanding transactions have been abandoned, the pager is able to			//以及当时其他的内存状态。所有的数据从磁盘重新加载(如果必要，热日志回滚操作执行)
 **    transition back to OPEN state, discarding the contents of the 
-**    page-cache and any other in-memory state at the same time. Everything
+**    page-cache and any other in-memory state at the same time. Everything			
 **    is reloaded from disk (and, if necessary, hot-journal rollback peformed)
-**    when a read-transaction is next opened on the pager (transitioning
+**    when a read-transaction is next opened on the pager (transitioning			//当pager上的读事务在下一步被开启(即pager转换为READER状态)。那时系统从错误中恢复
 **    the pager into READER state). At that point the system has recovered 
 **    from the error.
 **
-**    Specifically, the pager jumps into the ERROR state if:
+**    Specifically, the pager jumps into the ERROR state if:						//特别的，pager进入ERROR状态如果以下情况发生：
 **
-**      1. An error occurs while attempting a rollback. This happens in
+**      1. An error occurs while attempting a rollback. This happens in				1.当试图回滚时，错误发生。发生于功能sqlite3PagerRollback().中
 **         function sqlite3PagerRollback().
 **
-**      2. An error occurs while attempting to finalize a journal file
+**      2. An error occurs while attempting to finalize a journal file				2.当试图finalize在sqlite3PagerCommitPhaseTwo()中一个跟随提交的日志文件，错误发生
 **         following a commit in function sqlite3PagerCommitPhaseTwo().
 **
-**      3. An error occurs while attempting to write to the journal or
+**      3. An error occurs while attempting to write to the journal or				3.试图在pagerStress()中写日志或者数据库文件去释放内存时，错误发生
 **         database file in function pagerStress() in order to free up
 **         memory.
 **
-**    In other cases, the error is returned to the b-tree layer. The b-tree
-**    layer then attempts a rollback operation. If the error condition 
+**    In other cases, the error is returned to the b-tree layer. The b-tree			//其他情况，错误返回给b-tree层。B-tree层试图执行回滚操作。
+**    layer then attempts a rollback operation. If the error condition 				//如果错误状况持续下去，pager进入ERROR状态(由上述(1))
 **    persists, the pager enters the ERROR state via condition (1) above.
 **
-**    Condition (3) is necessary because it can be triggered by a read-only
-**    statement executed within a transaction. In this case, if the error
-**    code were simply returned to the user, the b-tree layer would not
-**    automatically attempt a rollback, as it assumes that an error in a
+**    Condition (3) is necessary because it can be triggered by a read-only			//情况（3）是必要的，因为它能够被一个事务范围内执行的只读语句触发。
+**    statement executed within a transaction. In this case, if the error			//这种情况下，如果错误码仅仅返回个用户，b-tree层不会尝试自动回滚
+**    code were simply returned to the user, the b-tree layer would not				
+**    automatically attempt a rollback, as it assumes that an error in a			//而是假设一个只读语句中的错误不能让pager处于内部不一致的状态
 **    read-only statement cannot leave the pager in an internally inconsistent 
 **    state.
 **
-**    * The Pager.errCode variable is set to something other than SQLITE_OK.
-**    * There are one or more outstanding references to pages (after the
+**    * The Pager.errCode variable is set to something other than SQLITE_OK.		//* pager.errCode 变量被设置未非SQLITE_OK的值。
+**    * There are one or more outstanding references to pages (after the			//* 有一个或多个对page的显示引用(在最后一个引用被pager删除时，pager应该回到OPEN状态)
 **      last reference is dropped the pager should move back to OPEN state).
-**    * The pager is not an in-memory pager.
+**    * The pager is not an in-memory pager.										//* pager不是一个内存pager
 **    
 **
-** Notes:
+** Notes:													
 **
-**   * A pager is never in WRITER_DBMOD or WRITER_FINISHED state if the
-**     connection is open in WAL mode. A WAL connection is always in one
-**     of the first four states.
+**   * A pager is never in WRITER_DBMOD or WRITER_FINISHED state if the				//* 如果连接在wal模式下打开，一个pager不会处于
+**     connection is open in WAL mode. A WAL connection is always in one			//WRITER_DBMOD or WRITER_FINISHED state. 一个WAL连接总是
+**     of the first four states.													//头四个状态中的一个
 **
-**   * Normally, a connection open in exclusive mode is never in PAGER_OPEN
-**     state. There are two exceptions: immediately after exclusive-mode has
-**     been turned on (and before any read or write transactions are 
+**   * Normally, a connection open in exclusive mode is never in PAGER_OPEN			//*一般而言，一个在exclusive模式下打开的连接不会处于PAGER_OPEN。
+**     state. There are two exceptions: immediately after exclusive-mode has		//由两个例外：exclusive-mode已经被开启(在读写事务执行之前)，
+**     been turned on (and before any read or write transactions are 				//pager保持于“error state”
 **     executed), and when the pager is leaving the "error state".
 **
-**   * See also: assert_pager_state().
+**   * See also: assert_pager_state().									
 */
 #define PAGER_OPEN                  0
 #define PAGER_READER                1
