@@ -76,13 +76,13 @@ typedef struct PgHdr DbPage;	//页面处理类型
 #define PAGER_LOCKINGMODE_EXCLUSIVE   1
 
 /*
-** Numeric constants that encode the journalmode.  
+** Numeric constants that encode the journalmode.  日志模式的编码
 */
 #define PAGER_JOURNALMODE_QUERY     (-1)  /* Query the value of journalmode */		//查询journalmode的值
 #define PAGER_JOURNALMODE_DELETE      0   /* Commit by deleting journal file */		//由删除日志文件提交
-#define PAGER_JOURNALMODE_PERSIST     1   /* Commit by zeroing journal header */	
+#define PAGER_JOURNALMODE_PERSIST     1   /* Commit by zeroing journal header */	//由归零日志头提交
 #define PAGER_JOURNALMODE_OFF         2   /* Journal omitted.  */					//关闭日志功能
-#define PAGER_JOURNALMODE_TRUNCATE    3   /* Commit by truncating journal */
+#define PAGER_JOURNALMODE_TRUNCATE    3   /* Commit by truncating journal */		//由截断日志提交
 #define PAGER_JOURNALMODE_MEMORY      4   /* In-memory journal file */				//内存日志文件
 #define PAGER_JOURNALMODE_WAL         5   /* Use write-ahead logging */				//开启预写日志功能
 
@@ -94,15 +94,15 @@ typedef struct PgHdr DbPage;	//页面处理类型
 ** 为了了解每个例程的详细介绍去看源码注释。
 */
 
-/* Open and close a Pager connection. */ 
+/* Open and close a Pager connection. */ 		//打开、关闭一个Pager连接
 int sqlite3PagerOpen(
-  sqlite3_vfs*, //pvfs  所应用的虚拟文件系统 ?
+  sqlite3_vfs*, //pvfs  所应用的虚拟文件系统 
   Pager **ppPager, //out：这里返回页面结构
   const char*, // zFilename //所打开的数据库文件名字
   int, //nExtra 在每一个内存页面上附加的额外的字节
   int,//flags 控制文件的标志？？？
-  int,//vfsFlag 通过sqlite3-vfs.XOpen（）的标志？？
-  void(*)(DbPage*)
+  int,//vfsFlag 传递给sqlite3-vfs.XOpen（）的标志？？
+  void(*)(DbPage*)		//数据库页面
 );
 int sqlite3PagerClose(Pager *pPager);
 int sqlite3PagerReadFileheader(Pager*, int, unsigned char*);
