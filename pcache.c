@@ -9,7 +9,7 @@
 **    May you share freely, never taking more than you give.
 **
 *************************************************************************
-** This file implements that page cache.
+** This file implements that page cache.										页缓存的实现
 */
 #include "sqliteInt.h"
 
@@ -17,22 +17,21 @@
 ** A complete page cache is an instance of this structure.
 */
 struct PCache {
-  PgHdr *pDirty, *pDirtyTail;         /* List of dirty pages in LRU order */
-  PgHdr *pSynced;                     /* Last synced page in dirty page list */
-  int nRef;                           /* Number of referenced pages */
-  int szCache;                        /* Configured cache size */
-  int szPage;                         /* Size of every page in this cache */
-  int szExtra;                        /* Size of extra space for each page */
-  int bPurgeable;                     /* True if pages are on backing store */
-  int (*xStress)(void*,PgHdr*);       /* Call to try make a page clean */
-  void *pStress;                      /* Argument to xStress */
-  sqlite3_pcache *pCache;             /* Pluggable cache module */
-  PgHdr *pPage1;                      /* Reference to page 1 */
-};
+  PgHdr *pDirty, *pDirtyTail;         /* List of dirty pages in LRU order */			LRU排序的脏页列表（队列）pDirty指向第一个，pDirtyTail指向最后一个。双向链表，链头插入，链尾移出
+  PgHdr *pSynced;                     /* Last synced page in dirty page list */			脏页列表中的上一个同步的页面
+  int nRef;                           /* Number of referenced pages */					引用页面的数目？？为什么放在这里
+  int szCache;                        /* Configured cache size */						配置的缓存大小
+  int szPage;                         /* Size of every page in this cache */			cache中每个页面的大小
+  int szExtra;                        /* Size of extra space for each page */			每个页面的额外空间大小
+  int bPurgeable;                     /* True if pages are on backing store */			页面如果在辅存中，为true
+  int (*xStress)(void*,PgHdr*);       /* Call to try make a page clean */				调用来清空一个页面
+  void *pStress;                      /* Argument to xStress */							xStress的参数
+  sqlite3_pcache *pCache;             /* Pluggable cache module */						可插的cache模块
+ };
 
 /*
-** Some of the assert() macros in this code are too expensive to run
-** even during normal debugging.  Use them only rarely on long-running
+** Some of the assert() macros in this code are too expensive to run					一些代价昂贵的测试
+** even during normal debugging.  Use them only rarely on long-running			
 ** tests.  Enable the expensive asserts using the
 ** -DSQLITE_ENABLE_EXPENSIVE_ASSERT=1 compile-time option.
 */
@@ -46,15 +45,15 @@ struct PCache {
 
 #if !defined(NDEBUG) && defined(SQLITE_ENABLE_EXPENSIVE_ASSERT)
 /*
-** Check that the pCache->pSynced variable is set correctly. If it
-** is not, either fail an assert or return zero. Otherwise, return
+** Check that the pCache->pSynced variable is set correctly. If it				检查pCache->pSynced变量是否被正确设置。如果没有，		
+** is not, either fail an assert or return zero. Otherwise, return				要么assert失败，要么返回0
 ** non-zero. This is only used in debugging builds, as follows:
 **
 **   expensive_assert( pcacheCheckSynced(pCache) );
 */
 static int pcacheCheckSynced(PCache *pCache){
   PgHdr *p;
-  for(p=pCache->pDirtyTail; p!=pCache->pSynced; p=p->pDirtyPrev){
+  for(p=pCache->pDirtyTail; p!=pCache->pSynced; p=p->pDirtyPrev){			//从pCache->pDirtyTail向前找，如果脏页面不等于已同步页面，则检查页面的引用数和同步标记
     assert( p->nRef || (p->flags&PGHDR_NEED_SYNC) );
   }
   return (p==0 || p->nRef || (p->flags&PGHDR_NEED_SYNC)==0);
@@ -62,7 +61,7 @@ static int pcacheCheckSynced(PCache *pCache){
 #endif /* !NDEBUG && SQLITE_ENABLE_EXPENSIVE_ASSERT */
 
 /*
-** Remove page pPage from the list of dirty pages.
+** Remove page pPage from the list of dirty pages.							从脏页面列表中删除页面pPage
 */
 static void pcacheRemoveFromDirtyList(PgHdr *pPage){
   PCache *p = pPage->pCache;
@@ -78,66 +77,66 @@ static void pcacheRemoveFromDirtyList(PgHdr *pPage){
     }
     p->pSynced = pSynced;
   }
-
-  if( pPage->pDirtyNext ){
+																			pPage是个双向链表，下面是双向链表删除元素的基本引用变换操作
+  if( pPage->pDirtyNext ){													如果当前pPage不是最后一个，删除的pPage之前，将pPage的前一个脏页面引用设置为pPage的下一个脏页面
     pPage->pDirtyNext->pDirtyPrev = pPage->pDirtyPrev;
   }else{
-    assert( pPage==p->pDirtyTail );
-    p->pDirtyTail = pPage->pDirtyPrev;
+    assert( pPage==p->pDirtyTail );											如果当前pPage是最后一个，将p->pDirtyTail指向pPage的前一个脏页面
+    p->pDirtyTail = pPage->pDirtyPrev;										
   }
-  if( pPage->pDirtyPrev ){
+  if( pPage->pDirtyPrev ){													如果pPage前一个脏页面存在，前一个脏页面的pDirtyNext指向当前pPage的下一个脏页面
     pPage->pDirtyPrev->pDirtyNext = pPage->pDirtyNext;
-  }else{
+  }else{																	如果pPage前一个页面不存在(即为第一个脏页面)，断言pPage是否是脏页面，将p->Dirty(链头)指向新的链头，即当前脏页的下一个脏页
     assert( pPage==p->pDirty );
-    p->pDirty = pPage->pDirtyNext;
+    p->pDirty = pPage->pDirtyNext;											
   }
-  pPage->pDirtyNext = 0;
+  pPage->pDirtyNext = 0;													将被删除的pPage的前后脏页面元素引用清空(pPage已经不是脏页面)
   pPage->pDirtyPrev = 0;
 
-  expensive_assert( pcacheCheckSynced(p) );
+  expensive_assert( pcacheCheckSynced(p) );									断言是否同步
 }
 
 /*
-** Add page pPage to the head of the dirty list (PCache1.pDirty is set to
+** Add page pPage to the head of the dirty list (PCache1.pDirty is set to		增加页面pPage到脏链表的头部（PCache1.pDirty设置为pPage）
 ** pPage).
 */
 static void pcacheAddToDirtyList(PgHdr *pPage){
-  PCache *p = pPage->pCache;
+  PCache *p = pPage->pCache;														
 
   assert( pPage->pDirtyNext==0 && pPage->pDirtyPrev==0 && p->pDirty!=pPage );
 
-  pPage->pDirtyNext = p->pDirty;
-  if( pPage->pDirtyNext ){
+  pPage->pDirtyNext = p->pDirty;											当前pPage的下一个脏页面引用指向当前链头
+  if( pPage->pDirtyNext ){													如果链头存在（如果存在脏页面），设置链头的前一个脏页面引用为当前pPage
     assert( pPage->pDirtyNext->pDirtyPrev==0 );
     pPage->pDirtyNext->pDirtyPrev = pPage;
   }
-  p->pDirty = pPage;
+  p->pDirty = pPage;														将当前链头引用设置为当前pPage
   if( !p->pDirtyTail ){
     p->pDirtyTail = pPage;
   }
-  if( !p->pSynced && 0==(pPage->flags&PGHDR_NEED_SYNC) ){
-    p->pSynced = pPage;
+  if( !p->pSynced && 0==(pPage->flags&PGHDR_NEED_SYNC) ){					如果上一个同步页面不存在、且？？
+    p->pSynced = pPage;														将上一个同步页面引用指向pPage
   }
   expensive_assert( pcacheCheckSynced(p) );
 }
 
 /*
-** Wrapper around the pluggable caches xUnpin method. If the cache is
+** Wrapper around the pluggable caches xUnpin method. If the cache is		可插的caches xUnpin 方法的包装器。如果cache被用于内存数据库，该函数不做任何操作
 ** being used for an in-memory database, this function is a no-op.
 */
 static void pcacheUnpin(PgHdr *p){
-  PCache *pCache = p->pCache;
-  if( pCache->bPurgeable ){
-    if( p->pgno==1 ){
-      pCache->pPage1 = 0;
+  PCache *pCache = p->pCache;												
+  if( pCache->bPurgeable ){													如果pCache是可清除的
+    if( p->pgno==1 ){														如果页面号是1
+      pCache->pPage1 = 0;													将pPage1置空
     }
     sqlite3GlobalConfig.pcache2.xUnpin(pCache->pCache, p->pPage, 0);
   }
 }
 
-/*************************************************** General Interfaces ******
+/*************************************************** General Interfaces ******				通用接口
 **
-** Initialize and shutdown the page cache subsystem. Neither of these 
+** Initialize and shutdown the page cache subsystem. Neither of these 			初始化和关闭cache两个函数都是线程安全的
 ** functions are threadsafe.
 */
 int sqlite3PcacheInitialize(void){
@@ -157,13 +156,13 @@ void sqlite3PcacheShutdown(void){
 }
 
 /*
-** Return the size in bytes of a PCache object.
+** Return the size in bytes of a PCache object.										返回PCache对象的字节大小
 */
 int sqlite3PcacheSize(void){ return sizeof(PCache); }
 
 /*
-** Create a new PCache object. Storage space to hold the object
-** has already been allocated and is passed in as the p pointer. 
+** Create a new PCache object. Storage space to hold the object						创建一个新的PCache对象。存储的对象的空间已经被分配并且作为p指针被传入。
+** has already been allocated and is passed in as the p pointer. 					调用者通过调用 sqlite3PcacheSize()知道多少的空间需要被分配
 ** The caller discovers how much space needs to be allocated by 
 ** calling sqlite3PcacheSize().
 */
@@ -181,15 +180,15 @@ void sqlite3PcacheOpen(
   p->bPurgeable = bPurgeable;
   p->xStress = xStress;
   p->pStress = pStress;
-  p->szCache = 100;
+  p->szCache = 100;				//配置缓存大小
 }
 
 /*
 ** Change the page size for PCache object. The caller must ensure that there
-** are no outstanding page references when this function is called.
+** are no outstanding page references when this function is called.			改变PCache对象的也大小，调用这个函数时，需要保证没有外部的页面引用
 */
 void sqlite3PcacheSetPageSize(PCache *pCache, int szPage){
-  assert( pCache->nRef==0 && pCache->pDirty==0 );
+  assert( pCache->nRef==0 && pCache->pDirty==0 );				检查pCache当前没有被引用且没有脏页面
   if( pCache->pCache ){
     sqlite3GlobalConfig.pcache2.xDestroy(pCache->pCache);
     pCache->pCache = 0;
@@ -199,7 +198,7 @@ void sqlite3PcacheSetPageSize(PCache *pCache, int szPage){
 }
 
 /*
-** Compute the number of pages of cache requested.
+** Compute the number of pages of cache requested.				计算需要的缓存页
 */
 static int numberOfCachePages(PCache *p){
   if( p->szCache>=0 ){
@@ -210,13 +209,13 @@ static int numberOfCachePages(PCache *p){
 }
 
 /*
-** Try to obtain a page from the cache.
+** Try to obtain a page from the cache.							从缓存中获取一个页面
 */
 int sqlite3PcacheFetch(
-  PCache *pCache,       /* Obtain the page from this cache */
+  PCache *pCache,       /* Obtain the page from this cache */	从该缓存中获取页面
   Pgno pgno,            /* Page number to obtain */
-  int createFlag,       /* If true, create page if it does not exist already */
-  PgHdr **ppPage        /* Write the page here */
+  int createFlag,       /* If true, create page if it does not exist already */		读代码中的逻辑
+  PgHdr **ppPage        /* Write the page here */				将获取到的页面写到该指针指向的内存中
 ){
   sqlite3_pcache_page *pPage = 0;
   PgHdr *pPgHdr = 0;
@@ -226,7 +225,7 @@ int sqlite3PcacheFetch(
   assert( createFlag==1 || createFlag==0 );
   assert( pgno>0 );
 
-  /* If the pluggable cache (sqlite3_pcache*) has not been allocated,
+  /* If the pluggable cache (sqlite3_pcache*) has not been allocated,		如果可插入的缓存(sqlite3_pcahce*)没有被分配，则分配
   ** allocate it now.
   */
   if( !pCache->pCache && createFlag ){
@@ -237,7 +236,7 @@ int sqlite3PcacheFetch(
     if( !p ){
       return SQLITE_NOMEM;
     }
-    sqlite3GlobalConfig.pcache2.xCachesize(p, numberOfCachePages(pCache));
+    sqlite3GlobalConfig.pcache2.xCachesize(p, numberOfCachePages(pCache));  
     pCache->pCache = p;
   }
 

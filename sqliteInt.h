@@ -509,13 +509,13 @@ extern const int sqlite3one;
 #define SMALLEST_INT64 (((i64)-1) - LARGEST_INT64)
 
 /* 
-** Round up a number to the next larger multiple of 8.  This is used
+** Round up a number to the next larger multiple of 8.  This is used			向上舍入，返回一个更大的8的倍数。这被用来强制在64-位架构上以8字节对齐
 ** to force 8-byte alignment on 64-bit architectures.
 */
-#define ROUND8(x)     (((x)+7)&~7)
+#define ROUND8(x)     (((x)+7)&~7)	
 
 /*
-** Round down to the nearest multiple of 8
+** Round down to the nearest multiple of 8										乡下舍入为最近的8的倍数
 */
 #define ROUNDDOWN8(x) ((x)&~7)
 

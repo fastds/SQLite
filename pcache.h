@@ -41,7 +41,7 @@ struct PgHdr {
   i16 nRef;                      /* Number of users of this page */				//当前页面的引用数
   PCache *pCache;                /* Cache that owns this page */				//拥有该页面的缓存
 
-  PgHdr *pDirtyNext;             /* Next element in list of dirty pages */		//脏页面列表中的下一个元素
+  PgHdr *pDirtyNext;             /* Next element in list of dirty pages */		//脏页面列表中的下一个元素（脏页面列表是一个双向列表，第一个元素和最后一个元素的引用在PCache中）
   PgHdr *pDirtyPrev;             /* Previous element in list of dirty pages */	//脏页面列表中的上一个元素
 };
 

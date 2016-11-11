@@ -10,8 +10,8 @@
 **
 *************************************************************************
 **
-** This file implements the default page cache implementation (the
-** sqlite3_pcache interface). It also contains part of the implementation
+** This file implements the default page cache implementation (the					该文件完成了默认页面缓存的实现(the sqlite3_pcache interface)。它也包含了SQLITE_CONFIG_PAGECACHE和sqlite3_release_memory()特性的实现。
+** sqlite3_pcache interface). It also contains part of the implementation			如果默认的页面缓存实现被覆盖，那么这两个特性都不可用
 ** of the SQLITE_CONFIG_PAGECACHE and sqlite3_release_memory() features.
 ** If the default page cache implementation is overriden, then neither of
 ** these two features are available.
@@ -24,86 +24,86 @@ typedef struct PgHdr1 PgHdr1;
 typedef struct PgFreeslot PgFreeslot;
 typedef struct PGroup PGroup;
 
-/* Each page cache (or PCache) belongs to a PGroup.  A PGroup is a set 
-** of one or more PCaches that are able to recycle each others unpinned
+/* Each page cache (or PCache) belongs to a PGroup.  A PGroup is a set 				每一个页缓存（PCache）数据一个PGroup。一个PGroup是一个或多个PCache的集合，使得它可在内存压力下能够重新利用每一个其他未被钉住的页面
+** of one or more PCaches that are able to recycle each others unpinned				一个PGroup是一个下列对象的实例
 ** pages when they are under memory pressure.  A PGroup is an instance of
 ** the following object.
 **
-** This page cache implementation works in one of two modes:
+** This page cache implementation works in one of two modes:						页面缓存机制以以下两种模式之一的实现
 **
-**   (1)  Every PCache is the sole member of its own PGroup.  There is
+**   (1)  Every PCache is the sole member of its own PGroup.  There is				（1） 每一个PCac和是它自己的PGrouop的一个成员。每一个PCahce由一个PGroup
 **        one PGroup per PCache.
 **
-**   (2)  There is a single global PGroup that all PCaches are a member
+**   (2)  There is a single global PGroup that all PCaches are a member				（2） 有一个单独的全局的PGroup，所有的PCache都是它的成员
 **        of.
 **
-** Mode 1 uses more memory (since PCache instances are not able to rob
-** unused pages from other PCaches) but it also operates without a mutex,
+** Mode 1 uses more memory (since PCache instances are not able to rob				模式1使用更多内存（因为PCache实例不能够抢占其他PCache未使用的页面），但是他能够在没有一个mutex的情况下运行，因此通常很高效
+** unused pages from other PCaches) but it also operates without a mutex,			模式2需要一个mutex，这是为了前程安全，但是循环利用pages更高效
 ** and is therefore often faster.  Mode 2 requires a mutex in order to be
 ** threadsafe, but recycles pages more efficiently.
 **
-** For mode (1), PGroup.mutex is NULL.  For mode (2) there is only a single
+** For mode (1), PGroup.mutex is NULL.  For mode (2) there is only a single			对于模式一，PGroup.mutex为NULL。 对于模式二，仅仅只有一个单独的PGroup，即pcache1.grp全局变量和它的mutex是SQLITE_MUTEX_STATIC_LRU.
 ** PGroup which is the pcache1.grp global variable and its mutex is
 ** SQLITE_MUTEX_STATIC_LRU.
 */
 struct PGroup {
-  sqlite3_mutex *mutex;          /* MUTEX_STATIC_LRU or NULL */
-  unsigned int nMaxPage;         /* Sum of nMax for purgeable caches */
+  sqlite3_mutex *mutex;          /* MUTEX_STATIC_LRU or NULL */								取值：MUTEX_STATIC_LRU 或 NULL
+  unsigned int nMaxPage;         /* Sum of nMax for MUTEX_STATIC_LRU or NULL caches */			
   unsigned int nMinPage;         /* Sum of nMin for purgeable caches */
-  unsigned int mxPinned;         /* nMaxpage + 10 - nMinPage */
-  unsigned int nCurrentPage;     /* Number of purgeable pages allocated */
-  PgHdr1 *pLruHead, *pLruTail;   /* LRU list of unpinned pages */
+  unsigned int mxPinned;         /* nMaxpage + 10 - nMinPage */								
+  unsigned int nCurrentPage;     /* Number of purgeable pages allocated */					可清除的已分配的页面数
+  PgHdr1 *pLruHead, *pLruTail;   /* LRU list of unpinned pages */							未钉住页面的LRU列表
 };
 
-/* Each page cache is an instance of the following object.  Every
-** open database file (including each in-memory database and each
+/* Each page cache is an instance of the following object.  Every					页面缓存对象。每个开开的数据库文件（包括每一个内存数据库和每一个临时数据库）有一个单独的页面缓存。
+** open database file (including each in-memory database and each					指向该类型结构体的指针被转换和返回为一个不透明的sqlite3——pcache*句柄
 ** temporary or transient database) has a single page cache which
 ** is an instance of this object.
 **
-** Pointers to structures of this type are cast and returned as 
+** Pointers to structures of this type are cast and returned as 			
 ** opaque sqlite3_pcache* handles.
 */
 struct PCache1 {
-  /* Cache configuration parameters. Page size (szPage) and the purgeable
-  ** flag (bPurgeable) are set when the cache is created. nMax may be 
+  /* Cache configuration parameters. Page size (szPage) and the purgeable			缓存配置参数。缓存被创建时，面大小（szPage）和可清理标记（bPurgeable）被设置。nMax可能在任何时候被修改，它的修改是通过调用pcahce1Cachesize()
+  ** flag (bPurgeable) are set when the cache is created. nMax may be 				方法。当访问nMax时PGroup的mutex必须被保存
   ** modified at any time by a call to the pcache1Cachesize() method.
   ** The PGroup mutex must be held when accessing nMax.
   */
-  PGroup *pGroup;                     /* PGroup this cache belongs to */
-  int szPage;                         /* Size of allocated pages in bytes */
-  int szExtra;                        /* Size of extra space in bytes */
-  int bPurgeable;                     /* True if cache is purgeable */
-  unsigned int nMin;                  /* Minimum number of pages reserved */
-  unsigned int nMax;                  /* Configured "cache_size" value */
-  unsigned int n90pct;                /* nMax*9/10 */
-  unsigned int iMaxKey;               /* Largest key seen since xTruncate() */
+  PGroup *pGroup;                     /* PGroup this cache belongs to */			当前缓存所属的PGroup
+  int szPage;                         /* Size of allocated pages in bytes */		已分配页面的字节大小
+  int szExtra;                        /* Size of extra space in bytes */			额外空间的字节大小
+  int bPurgeable;                     /* True if cache is purgeable */				清除标记
+  unsigned int nMin;                  /* Minimum number of pages reserved */		保留页面的最小数
+  unsigned int nMax;                  /* Configured "cache_size" value */			配置的 cache_size大小
+  unsigned int n90pct;                /* nMax*9/10 */								nMax的百分之九十
+  unsigned int iMaxKey;               /* Largest key seen since xTruncate() */		xTruncate()以来的最大key
 
-  /* Hash table of all pages. The following variables may only be accessed
+  /* Hash table of all pages. The following variables may only be accessed			所有页面的哈希表。以下变量可能仅仅在访问者持有PGroup mutex的时候被访问
   ** when the accessor is holding the PGroup mutex.
-  */
-  unsigned int nRecyclable;           /* Number of pages in the LRU list */
-  unsigned int nPage;                 /* Total number of pages in apHash */
-  unsigned int nHash;                 /* Number of slots in apHash[] */
-  PgHdr1 **apHash;                    /* Hash table for fast lookup by key */
+  */		
+  unsigned int nRecyclable;           /* Number of pages in the LRU list */			LRU列表中的页面数
+  unsigned int nPage;                 /* Total number of pages in apHash */			apHash中页面的总数
+  unsigned int nHash;                 /* Number of slots in apHash[] */				apHash[]的槽的数量
+  PgHdr1 **apHash;                    /* Hash table for fast lookup by key */		用于快速查找key的哈希表
 };
 
 /*
-** Each cache entry is represented by an instance of the following 
-** structure. Unless SQLITE_PCACHE_SEPARATE_HEADER is defined, a buffer of
+** Each cache entry is represented by an instance of the following 					以下对象，表示每一个缓存entry。除非SQLITE_PCAHE_SEPARATE_HEADER被定义，在这个结构体在内存之前。
+** structure. Unless SQLITE_PCACHE_SEPARATE_HEADER is defined, a buffer of			一个 PgHdr1.pCache->szPage字节大小的缓冲区被直接分配
 ** PgHdr1.pCache->szPage bytes is allocated directly before this structure 
 ** in memory.
 */
 struct PgHdr1 {
   sqlite3_pcache_page page;
-  unsigned int iKey;             /* Key value (page number) */
-  PgHdr1 *pNext;                 /* Next in hash table chain */
-  PCache1 *pCache;               /* Cache that currently owns this page */
-  PgHdr1 *pLruNext;              /* Next in LRU list of unpinned pages */
-  PgHdr1 *pLruPrev;              /* Previous in LRU list of unpinned pages */
+  unsigned int iKey;             /* Key value (page number) */						键的值（页号）
+  PgHdr1 *pNext;                 /* Next in hash table chain */						哈希表chain中的下一个
+  PCache1 *pCache;               /* Cache that currently owns this page */			拥有当前页面的页缓存
+  PgHdr1 *pLruNext;              /* Next in LRU list of unpinned pages */			LRU列表中未钉住页面的下一个
+  PgHdr1 *pLruPrev;              /* Previous in LRU list of unpinned pages */		.....................上一个
 };
 
 /*
-** Free slots in the allocator used to divide up the buffer provided using
+** Free slots in the allocator used to divide up the buffer provided using			
 ** the SQLITE_CONFIG_PAGECACHE mechanism.
 */
 struct PgFreeslot {
@@ -111,30 +111,30 @@ struct PgFreeslot {
 };
 
 /*
-** Global data used by this cache.
+** Global data used by this cache.													被用于这个cache的全局数据
 */
 static SQLITE_WSD struct PCacheGlobal {
-  PGroup grp;                    /* The global PGroup for mode (2) */
+  PGroup grp;                    /* The global PGroup for mode (2) */				模式2中的PGroup
 
-  /* Variables related to SQLITE_CONFIG_PAGECACHE settings.  The
+  /* Variables related to SQLITE_CONFIG_PAGECACHE settings.  The					与SQLITE_CONFIT_PAGECACHE设置相关的变量。
   ** szSlot, nSlot, pStart, pEnd, nReserve, and isInit values are all
   ** fixed at sqlite3_initialize() time and do not require mutex protection.
   ** The nFreeSlot and pFree values do require mutex protection.
   */
-  int isInit;                    /* True if initialized */
-  int szSlot;                    /* Size of each free slot */
-  int nSlot;                     /* The number of pcache slots */
-  int nReserve;                  /* Try to keep nFreeSlot above this */
-  void *pStart, *pEnd;           /* Bounds of pagecache malloc range */
-  /* Above requires no mutex.  Use mutex below for variable that follow. */
-  sqlite3_mutex *mutex;          /* Mutex for accessing the following: */
-  PgFreeslot *pFree;             /* Free page blocks */
-  int nFreeSlot;                 /* Number of unused pcache slots */
-  /* The following value requires a mutex to change.  We skip the mutex on
-  ** reading because (1) most platforms read a 32-bit integer atomically and
+  int isInit;                    /* True if initialized */							如果被初始化了，为true
+  int szSlot;                    /* Size of each free slot */						每一个空闲槽的大小
+  int nSlot;                     /* The number of pcache slots */					pcache槽的数量
+  int nReserve;                  /* Try to keep nFreeSlot above this */				
+  void *pStart, *pEnd;           /* Bounds of pagecache malloc range */				页缓存分配的边界范围
+  /* Above requires no mutex.  Use mutex below for variable that follow. */			以下变量用于mutex情况
+  sqlite3_mutex *mutex;          /* Mutex for accessing the following: */			访问以下内容的mutex
+  PgFreeslot *pFree;             /* Free page blocks */								空闲的页面块
+  int nFreeSlot;                 /* Number of unused pcache slots */				未使用的pcache槽
+  /* The following value requires a mutex to change.  We skip the mutex on			以下的值需要一个mutex去改变，我们跳过了在reading上的mutex，因为(1)大多数平台自动读取32-bit整数（2）即使一个错误的值被读取，
+  ** reading because (1) most platforms read a 32-bit integer atomically and		也不会造成多大的伤害，因为这仅仅是一个优化项
   ** (2) even if an incorrect value is read, no great harm is done since this
   ** is really just an optimization. */
-  int bUnderPressure;            /* True if low on PAGECACHE memory */
+  int bUnderPressure;            /* True if low on PAGECACHE memory */				如果PAGECACHE内存处于较低水平
 } pcache1_g;
 
 /*

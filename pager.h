@@ -43,7 +43,7 @@ typedef struct Pager Pager;
 /*
 ** Handle type for pages.
 */
-typedef struct PgHdr DbPage;	//页面处理类型
+typedef struct PgHdr DbPage;	//页面控制类型
 
 /*
 ** Page number PAGER_MJ_PGNO is never used in an SQLite database (it is
@@ -61,15 +61,13 @@ typedef struct PgHdr DbPage;	//页面处理类型
 /*
 ** Allowed values for the flags parameter to sqlite3PagerOpen().
 **
-** NOTE: These values must match the corresponding BTREE_ values in btree.h.
-** sqlite3PagerOpen()的标志参数的可选值。注意:这些值必须匹配在btree.h BTREE的对应值。
+** NOTE: These values must match the corresponding BTREE_ values in btree.h.		sqlite3PagerOpen()的标志参数的可选值。注意:这些值必须匹配在btree.h BTREE的对应值。
 */
 #define PAGER_OMIT_JOURNAL  0x0001    /* Do not use a rollback journal */			//不使用回滚日志
 #define PAGER_MEMORY        0x0002    /* In-memory database */						//内存数据库
 
 /*
-** Valid values for the second argument to sqlite3PagerLockingMode().
-** sqlite3PagerLockingMode()第二个参数的有效值。
+** Valid values for the second argument to sqlite3PagerLockingMode().				sqlite3PagerLockingMode()第二个参数的有效值。
 */
 #define PAGER_LOCKINGMODE_QUERY      -1
 #define PAGER_LOCKINGMODE_NORMAL      0
