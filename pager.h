@@ -119,7 +119,7 @@ int sqlite3PagerOkToChangeJournalMode(Pager*);
 i64 sqlite3PagerJournalSizeLimit(Pager *, i64);
 sqlite3_backup **sqlite3PagerBackupPtr(Pager*);						//备份的页面指针
 	
-/* Functions used to obtain and release page references. */ 		//以下函数用来用户获取和释放页面引用
+/* Functions used to obtain and release page references. */ 		//以下函数用来获取和释放页面引用
 int sqlite3PagerAcquire(Pager *pPager, Pgno pgno, DbPage **ppPage, int clrFlag);
 #define sqlite3PagerGet(A,B,C) sqlite3PagerAcquire(A,B,C,0)
 DbPage *sqlite3PagerLookup(Pager *pPager, Pgno pgno);

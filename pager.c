@@ -681,7 +681,7 @@ struct Pager {
   void (*xCodecFree)(void*);             /* Destructor for the codec */				
   void *pCodec;               /* First argument to xCodec... methods */				//xCodec...函数的第一个参数
 #endif
-  char *pTmpSpace;            /* Pager.pageSize bytes of space for tmp use */		//
+  char *pTmpSpace;            /* Pager.pageSize bytes of space for tmp use */		//Pager.pageSize字节大小的空间，作为临时空间使用
   PCache *pPCache;            /* Pointer to page cache object */					//页缓冲区指针
 #ifndef SQLITE_OMIT_WAL
   Wal *pWal;                  /* Write-ahead log used by "journal_mode=wal" */		//
@@ -4172,25 +4172,25 @@ static int subjournalPage(PgHdr *pPg){
 }
 
 /*
-** This function is called by the pcache layer when it has reached some
-** soft memory limit. The first argument is a pointer to a Pager object
-** (cast as a void*). The pager is always 'purgeable' (not an in-memory
+** This function is called by the pcache layer when it has reached some	当达到了某个soft memory限制时，本功能被pcache层调用。第一个参数是Pager对象指针(被转换为void*)
+** soft memory limit. The first argument is a pointer to a Pager object  pager总是‘purgeable’(不是一个内存数据库)。
+** (cast as a void*). The pager is always 'purgeable' (not an in-memory	第二个参数是一个当前为脏page的引用，但是没有外部引用。页面总是与第一个参数Pager对象相关联
 ** database). The second argument is a reference to a page that is 
 ** currently dirty but has no outstanding references. The page
 ** is always associated with the Pager object passed as the first 
 ** argument.
 **
-** The job of this function is to make pPg clean by writing its contents
-** out to the database file, if possible. This may involve syncing the
+** The job of this function is to make pPg clean by writing its contents	该函数的工作就是通过将pPg的内容写到数据库文件使其 clean，如果可能的话。本操作可能包含同步
+** out to the database file, if possible. This may involve syncing the		日志文件
 ** journal file. 
 **
-** If successful, sqlite3PcacheMakeClean() is called on the page and
-** SQLITE_OK returned. If an IO error occurs while trying to make the
-** page clean, the IO error code is returned. If the page cannot be
+** If successful, sqlite3PcacheMakeClean() is called on the page and		如果成功，sqlite3PcacheMakeClean()在这个page上被调用来让page clean，如果发生IO错误，
+** SQLITE_OK returned. If an IO error occurs while trying to make the		IO错误码被返回。如果页面由于某个原因不能让其clean，但又没有错误发生，那么SQLITE_OK
+** page clean, the IO error code is returned. If the page cannot be			将被返回，sqlite3PcacheMakeClean()不被调用
 ** made clean for some other reason, but no error occurs, then SQLITE_OK
 ** is returned by sqlite3PcacheMakeClean() is not called.
 */
-static int pagerStress(void *p, PgHdr *pPg){
+static int (void *p, PgHdr *pPg){
   Pager *pPager = (Pager *)p;
   int rc = SQLITE_OK;
 
@@ -4517,7 +4517,7 @@ int sqlite3PagerOpen(
     readOnly = (vfsFlags&SQLITE_OPEN_READONLY);
   }
 
-  /* The following call to PagerSetPagesize() serves to set the value of  对PagerSetPagesize()的调用用来设置Pager.pageSize的值，并分配 Pager.pTmpSpace缓冲区的空间
+  /* The following call to PagerSetPagesize() serves to set the value of  对PagerSetPagesize()的调用用来设置Pager.pageSize的值，并分配 Pager.pTmpSpace缓冲区
   ** Pager.pageSize and to allocate the Pager.pTmpSpace buffer.
   */
   if( rc==SQLITE_OK ){
@@ -4536,9 +4536,9 @@ int sqlite3PagerOpen(
     return rc;
   }
 
-  /* Initialize the PCache object. */				初始化PCache独享
+  /* Initialize the PCache object. */				初始化PCache对象，设置其内部值
   assert( nExtra<1000 );
-  nExtra = ROUND8(nExtra);							将额外空间的大小8字节对其，以适应64位架构
+  nExtra = ROUND8(nExtra);							将额外空间的大小8字节对齐，以适应64位架构
   sqlite3PcacheOpen(szPageDflt, nExtra, !memDb,
                     !memDb?pagerStress:0, (void *)pPager, pPager->pPCache);
 
@@ -4583,7 +4583,7 @@ int sqlite3PagerOpen(
   /* pPager->pFirstSynced = 0; */
   /* pPager->pLast = 0; */
   pPager->nExtra = (u16)nExtra;				Pager额外空间的大小（两个字节的无符号数）
-  pPager->journalSizeLimit = SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT;			日志带下限制设置
+  pPager->journalSizeLimit = SQLITE_DEFAULT_JOURNAL_SIZE_LIMIT;			日志大小限制设置
   assert( isOpen(pPager->fd) || tempFile );		检查文件是否打开，或者是否是一个临时文件
   setSectorSize(pPager);				设置扇区大小
   if( !useJournal ){					如果未使用日志
