@@ -853,7 +853,7 @@ static int assert_pager_state(Pager *p){
     assert( pagerUseWal(p)==0 );
   }
 
-  /* If changeCountDone is set, a RESERVED lock or greater must be held
+  /* If changeCountDone is set, a RESERVED lock or greater must be held  	 如果changeCountDone被设置，一个RESERVED锁或者更大的锁被当前文件持有
   ** on the file.
   */
   assert( pPager->changeCountDone==0 || pPager->eLock>=RESERVED_LOCK );
@@ -3381,6 +3381,17 @@ void sqlite3PagerShrink(Pager *pPager){
 **
 ** Numeric values associated with these states are OFF==1, NORMAL=2,
 ** and FULL=3.
+	OS崩溃是，数据库的鲁棒性：有三个等级：
+	OFF=1：sqlite3OsSync() 不会被调用，对于temporary和transient文件是默认设置
+	NORMAL=2：一旦开始在数据库开始一个写操作，日志被同步。这在通常情况下已经提供了足够的保护，虽然可能性非常小，但是理论上可能，一次power falure可能会让日志在回滚时让数据库损毁数据库文件
+	FULL=3：开始写数据库之前，将日志进行两次同步操作（附加一些额外信息-日志头的nRec域-在两次同步之间被写）。如果我们假设对一个磁盘扇区的写操作时原子的，那么该模式提供了一个保证，在回滚期间，日志将不会在造成数据库损毁的点被破坏
+	
+	上述内容针对回滚日志模式。对于WAL模式：
+	OFF：同上
+	NORMAL：在检查点开始之前WAL被同步，并且数据库文件在检查点conclusion时如果整个WAL被写到数据库当中，数据库文件被同步。NORMAL模式下的普通提交操作，同步操作不发生
+	FULL：随着每个提交操作，WAL被同步，除了与NORMAL关联的同步之外。
+	
+	不要混淆synchronous=FULL with SQLITE_SYNC_FULL。在非MacOS上，他们没区别。
 */
 #ifndef SQLITE_OMIT_PAGER_PRAGMAS
 void sqlite3PagerSetSafetyLevel(
@@ -3640,9 +3651,9 @@ void enable_simulated_io_errors(void){
 	如果pager以临时一个临时文件打开（即用户为输入文件名），或者打开了一个小于N字节大小的文件，输出缓冲区被置零并返回SQLITE_OK。
 	该操作的基本原理：这个函数被用来读取数据库头，且一个新的临时或者置零的数据库有这样一个头：其大小大于整个文件大小
 	
-	如果除了SQLITE_IOERR_SHORT_READ 的其他IO错误码被命中，将其返回给低啊用这，且输出缓冲区的内容为未定义状态
+	如果除了SQLITE_IOERR_SHORT_READ 的其他IO错误码被命中，将其返回给调用者，且输出缓冲区的内容为未定义状态
 */
-int sqlite3PagerReadFileheader(Pager *pPager, int N, unsigned char *pDest){				pDest:"SQLite format 3"
+int sqlite3PagerReadFileheader(Pager *pPager, int N, unsigned char *pDest){		N:100	pDest:"SQLite format 3"
   int rc = SQLITE_OK;
   memset(pDest, 0, N);
   assert( isOpen(pPager->fd) || pPager->tempFile );				检查文件是否打开，（若未打开）或者是否是临时文件
@@ -4380,7 +4391,13 @@ int sqlite3PagerOpen(
   ** (there are two of them, the main journal and the sub-journal). This		
   ** is the maximum space required for an in-memory journal file handle 
   ** and a regular journal file-handle. Note that a "regular journal-handle"	"regular journal-handle"可能是一个包装器，包含的数据缓存了
-  ** may be a wrapper capable of caching the first portion of the journal		将用实现atomic-write优化的主存日志文件的第一个部分（见journal.c）
+  ** may be a wrapper capable of caching the first portion of the journal		将
+  
+  
+  
+  
+  
+  用实现atomic-write优化的主存日志文件的第一个部分（见journal.c）
   ** file in memory to implement the atomic-write optimization (see 
   ** source file journal.c).
   */
@@ -4416,7 +4433,7 @@ int sqlite3PagerOpen(
     if( zPathname==0 ){
       return SQLITE_NOMEM;		//分配空间失败，返回 无可用内存
     }
-    zPathname[0] = 0; /* Make sure initialized even if FullPathname() fails */
+    zPathname[0] = 0; /* Make sure initialized even if FullPathname() fails */		即使存储全路径名的空间分配失败，也要确保已经初始化
     rc = sqlite3OsFullPathname(pVfs, zFilename, nPathname, zPathname);
     nPathname = sqlite3Strlen30(zPathname);
     z = zUri = &zFilename[sqlite3Strlen30(zFilename)+1];
@@ -4489,7 +4506,7 @@ int sqlite3PagerOpen(
 #ifndef SQLITE_OMIT_WAL									运行
     pPager->zWal = &pPager->zJournal[nPathname+8+1];
     memcpy(pPager->zWal, zPathname, nPathname);
-    memcpy(&pPager->zWal[nPathname], "-wal\000", 4+1);							设置雨鞋日志名：设置日志文件名：  数据文件名-wal
+    memcpy(&pPager->zWal[nPathname], "-wal\000", 4+1);							设置预写日志名：设置日志文件名：  数据文件名-wal
     sqlite3FileSuffix3(pPager->zFilename, pPager->zWal);
 #endif
     sqlite3DbFree(0, zPathname);	//？？
