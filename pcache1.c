@@ -825,9 +825,9 @@ fetch_out:
 
 
 /*
-** Implementation of the sqlite3_pcache.xUnpin method.
+** Implementation of the sqlite3_pcache.xUnpin method.			sqlite3_pcache.xUnpin方法的实现。将一个页面标记为“未钉住的”	（对于异步回收操作是可用的）		
 **
-** Mark a page as unpinned (eligible for asynchronous recycling).
+** Mark a page as unpinned (eligible for asynchronous recycling).		
 */
 static void pcache1Unpin(
   sqlite3_pcache *p, 

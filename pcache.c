@@ -20,13 +20,13 @@ struct PCache {
   PgHdr *pDirty, *pDirtyTail;         /* List of dirty pages in LRU order */			LRU排序的脏页列表（队列）pDirty指向第一个，pDirtyTail指向最后一个。双向链表，链头插入，链尾移出
   PgHdr *pSynced;                     /* Last synced page in dirty page list */			脏页列表中的上一个同步的页面
   int nRef;                           /* Number of referenced pages */					引用页面的数目？？为什么放在这里
-  int szCache;                        /* Configured cache size */						配置的缓存大小
+  int szCache;                        /* Configured cache size */						配置的缓存大小（页面数量）
   int szPage;                         /* Size of every page in this cache */			cache中每个页面的大小
   int szExtra;                        /* Size of extra space for each page */			每个页面的额外空间大小
-  int bPurgeable;                     /* True if pages are on backing store */			页面如果在辅存中，为true
+  int bPurgeable;                     /* True if pages are on backing store */			清除标记（页面如果在辅存中，为true）
   int (*xStress)(void*,PgHdr*);       /* Call to try make a page clean */				调用来清空一个页面
   void *pStress;                      /* Argument to xStress */							xStress的参数
-  sqlite3_pcache *pCache;             /* Pluggable cache module */						可插的cache模块
+  sqlite3_pcache *pCache;             /* Pluggable cache module */						可插的pcache模块（PCache1）
  };
 
 /*

@@ -23,7 +23,7 @@ typedef struct PCache PCache;
 ** structure.
 */
 struct PgHdr {
-  sqlite3_pcache_page *pPage;    /* Pcache object page handle */				//Pcache对象 页面句柄
+  sqlite3_pcache_page *pPage;    /* Pcache object page handle */				//Pcache对象 页面句柄（PgHdr1结构体）
   void *pData;                   /* Page data */								//页面数据
   void *pExtra;                  /* Extra content */							//额外内容
   PgHdr *pDirty;                 /* Transient list of dirty pages */			//脏页面的内存维护的列表

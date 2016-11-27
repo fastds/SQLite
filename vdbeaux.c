@@ -999,6 +999,13 @@ void sqlite3VdbeUsesBtree(Vdbe *p, int i){
 ** corresponding to btrees that use shared cache.  Then the runtime of
 ** this routine is N*N.  But as N is rarely more than 1, this should not
 ** be a problem.
+	共享缓存、线程安全编译模式下。该函数获得与每一个可能被参数VM访问的BtShared结构体关联的mutex。这样的话，也会设置BtShared结构体的每一个 BtShared.db member，确保需要时，正确的busy-handler回调被调用
+	
+	如果SQLite不是线程安全的，但是支持共享缓存模式，那么sqlite3BtreeEnter()被调用来设置BtShared结构体的所有BtShared.db变量凭借与VM关联的数据库句柄是可访问的。
+	
+	如果SQLite不是线程安全的，且不支持共享缓存模式，该函数什么都不做
+	
+	p->btreeMask是所有预编译语句p会使用的btree的位掩码。N是对应的使用共享缓存的btree的p->btreeMask的位数。该函数的运行时间为N*N。但是N很少超过1，所有这个问题可以忽略。
 */
 void sqlite3VdbeEnter(Vdbe *p){
   int i;
