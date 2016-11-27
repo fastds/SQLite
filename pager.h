@@ -136,7 +136,7 @@ void *sqlite3PagerGetExtra(DbPage *); 						//获取页面额外数据(溢出页
 
 /* Functions used to manage pager transactions and savepoints. */		//被用户管理页面交互和保存点的功能
 void sqlite3PagerPagecount(Pager*, int*);								//Pager包含的页面数
-int sqlite3PagerBegin(Pager*, int exFlag, int);							
+int sqlite3PagerBegin(Pager*, int exFlag, int);							//在pager上开始一个写事务
 int sqlite3PagerCommitPhaseOne(Pager*,const char *zMaster, int);		//Pager一阶段提交
 int sqlite3PagerExclusiveLock(Pager*);									//Pager互斥锁
 int sqlite3PagerSync(Pager *pPager);									//Pager同步(刷新？)操作

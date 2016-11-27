@@ -515,7 +515,7 @@ extern const int sqlite3one;
 #define ROUND8(x)     (((x)+7)&~7)	
 
 /*
-** Round down to the nearest multiple of 8										乡下舍入为最近的8的倍数
+** Round down to the nearest multiple of 8										乡下舍入为
 */
 #define ROUNDDOWN8(x) ((x)&~7)
 

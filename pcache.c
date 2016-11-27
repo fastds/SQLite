@@ -167,18 +167,18 @@ int sqlite3PcacheSize(void){ return sizeof(PCache); }
 ** calling sqlite3PcacheSize().
 */
 void sqlite3PcacheOpen(
-  int szPage,                  /* Size of every page */
-  int szExtra,                 /* Extra space associated with each page */
-  int bPurgeable,              /* True if pages are on backing store */
-  int (*xStress)(void*,PgHdr*),/* Call to try to make pages clean */
-  void *pStress,               /* Argument to xStress */
-  PCache *p                    /* Preallocated space for the PCache */
+  int szPage,                  /* Size of every page */								每个页面的大小
+  int szExtra,                 /* Extra space associated with each page */			每个页面的额外空间大小
+  int bPurgeable,              /* True if pages are on backing store */				如果页面在后备存储器中
+  int (*xStress)(void*,PgHdr*),/* Call to try to make pages clean */				调用来试图让净化页面
+  void *pStress,               /* Argument to xStress */							xStress的参数
+  PCache *p                    /* Preallocated space for the PCache */				预分配给PCache的空间
 ){
-  memset(p, 0, sizeof(PCache));
-  p->szPage = szPage;
-  p->szExtra = szExtra;
-  p->bPurgeable = bPurgeable;
-  p->xStress = xStress;
+  memset(p, 0, sizeof(PCache));					PCache：1、设置页面大小 2、设置页面额外空间 3、设置可清除标记 4、设置净化页面的方法 5、设置上个方法的参数 5、设置缓存大小=100
+  p->szPage = szPage;							1024
+  p->szExtra = szExtra;							120
+  p->bPurgeable = bPurgeable;					1
+  p->xStress = xStress;							
   p->pStress = pStress;
   p->szCache = 100;				//配置缓存大小
 }
@@ -576,7 +576,7 @@ int sqlite3PcachePagecount(PCache *pCache){
 
 #ifdef SQLITE_TEST
 /*
-** Get the suggested cache-size value.
+** Get the suggested cache-size value.		
 */
 int sqlite3PcacheGetCachesize(PCache *pCache){
   return numberOfCachePages(pCache);
@@ -595,7 +595,7 @@ void sqlite3PcacheSetCachesize(PCache *pCache, int mxPage){
 }
 
 /*
-** Free up as much memory as possible from the page cache.
+** Free up as much memory as possible from the page cache.			
 */
 void sqlite3PcacheShrink(PCache *pCache){
   if( pCache->pCache ){
