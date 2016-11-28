@@ -331,6 +331,7 @@ void sqlite3PcacheRelease(PgHdr *p){
 
 /*
 ** Increase the reference count of a supplied page by 1.
+将提供的页的引用计数增加1。
 */
 void sqlite3PcacheRef(PgHdr *p){
   assert(p->nRef>0);
@@ -608,6 +609,7 @@ void sqlite3PcacheShrink(PCache *pCache){
 ** For all dirty pages currently in the cache, invoke the specified
 ** callback. This is only used if the SQLITE_CHECK_PAGES macro is
 ** defined.
+对于当前缓存中所有脏页面，调用指定毁掉函数。这仅仅被用于SQLITE_CHECK_PAGES宏被定义的情况
 */
 void sqlite3PcacheIterateDirty(PCache *pCache, void (*xIter)(PgHdr *)){
   PgHdr *pDirty;
