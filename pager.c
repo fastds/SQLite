@@ -365,7 +365,7 @@ int sqlite3PagerTrace=1;  /* True to enable tracing */
 ** the pagerLockDb() and pagerUnlockDb() wrappers.
 **
 ** If the VFS xLock() or xUnlock() returns an error other than SQLITE_BUSY			//如果VFS的xLock()/xUnlock()返回错误而非SQLITE_BUSY
-** (i.e. one of the SQLITE_IOERR subtypes), it is not clear whether or not			//(例如SQLITE_IOERR子类型之一)，无论操作是否成功，它都是脏的
+** (i.e. one of the SQLITE_IOERR subtypes), it is not clear whether or not			//(例如SQLITE_IOERR子类型之一)，无法确定操作是否成功。
 ** the operation was successful. In these circumstances pagerLockDb() and			//这种情况pagerLockDb()和pagerUnlockDb()采取一个保守方法——
 ** pagerUnlockDb() take a conservative approach - eLock is always updated			//当解锁文件时，eLock总是被更新
 ** when unlocking the file, and only updated when locking the file if the			//并且仅在对VFS调用成功的文件加锁时被更新
@@ -506,7 +506,7 @@ struct PagerSavepoint {
 **   committed or rolled back when running in "journal_mode=PERSIST" mode.		//或回滚自后日志文件被finalize的方式
 **   If a journal file does not contain a master-journal pointer, it is			//如果一个日志文件不包含一个master-journal指针
 **   finalized by overwriting the first journal header with zeroes. If			//它就会通过将日志头覆写为0来finalize
-**   it does contain a master-journal pointer the journal file is finalized 	//如果包含了master-journal指针，通过将日志文件截断为0来finalized
+**   it does contain a master-journal pointer the journal file is finalized 	//如果包含了master-journal指针，通过将日志文件截断为0个字节来finalized
 **   by truncating it to zero bytes, just as if the connection were 			//就像连接运行在"journal_mode=truncate" 模式
 **   running in "journal_mode=truncate" mode.
 **
@@ -3381,7 +3381,7 @@ void sqlite3PagerShrink(Pager *pPager){
 **
 ** Numeric values associated with these states are OFF==1, NORMAL=2,
 ** and FULL=3.
-	OS崩溃是，数据库的鲁棒性：有三个等级：
+	OS崩溃是，调整数据库的鲁棒性：有三个等级：
 	OFF=1：sqlite3OsSync() 不会被调用，对于temporary和transient文件是默认设置
 	NORMAL=2：一旦开始在数据库开始一个写操作，日志被同步。这在通常情况下已经提供了足够的保护，虽然可能性非常小，但是理论上可能，一次power falure可能会让日志在回滚时让数据库损毁数据库文件
 	FULL=3：开始写数据库之前，将日志进行两次同步操作（附加一些额外信息-日志头的nRec域-在两次同步之间被写）。如果我们假设对一个磁盘扇区的写操作时原子的，那么该模式提供了一个保证，在回滚期间，日志将不会在造成数据库损毁的点被破坏
@@ -3588,6 +3588,7 @@ int sqlite3PagerSetPagesize(Pager *pPager, u32 *pPageSize, int nReserve){
 ** during rollback and will be overwritten whenever a rollback
 ** occurs.  But other modules are free to use it too, as long as
 ** no rollbacks are happening.
+返回一个Pager内部持有的指向“临时页面”的缓冲区的指针。该缓冲区足够装下一个数据库页面的整个内容。该缓冲区在回滚或被写期间被内部使用。但就算回滚不发生其他模块也能使用它
 */
 void *sqlite3PagerTempSpace(Pager *pPager){
   return pPager->pTmpSpace;
@@ -3680,6 +3681,7 @@ int sqlite3PagerReadFileheader(Pager *pPager, int N, unsigned char *pDest){		N:1
 **
 ** However, if the file is between 1 and <page-size> bytes in size, then 
 ** this is considered a 1 page file.
+该方法可能只当pager上的一个读事务打开时被调用。返回数据库页面的总数。如果文件大小为1 and <page-size>字节，那么将其视为一个页面文件
 */
 void sqlite3PagerPagecount(Pager *pPager, int *pnPage){
   assert( pPager->eState>=PAGER_READER );
@@ -3717,7 +3719,7 @@ static int pager_wait_on_lock(Pager *pPager, int locktype){
        || (pPager->eLock==NO_LOCK && locktype==SHARED_LOCK)
        || (pPager->eLock==RESERVED_LOCK && locktype==EXCLUSIVE_LOCK)
   );
-
+														循环测试对pager加锁操作的结果码，并调用忙处理例程
   do {
     rc = pagerLockDb(pPager, locktype);
   }while( rc==SQLITE_BUSY && pPager->xBusyHandler(pPager->pBusyHandlerArg) );
@@ -4802,6 +4804,8 @@ static int hasHotJournal(Pager *pPager, int *pExists){
 ** If everything is successful, SQLITE_OK is returned. If an IO error 
 ** occurs while locking the database, checking for a hot-journal file or 
 ** rolling back a journal file, the IO error code is returned.
+
+用来获取一个数据库文件上的共享锁。在该函数成功被调用之后，对函数sqlite3PagerAcquire()的调用才是合法的。
 */
 int sqlite3PagerSharedLock(Pager *pPager){
   int rc = SQLITE_OK;                /* Return code */

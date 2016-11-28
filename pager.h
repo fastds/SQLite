@@ -12,7 +12,7 @@
 ** This header file defines the interface that the sqlite page cache
 ** subsystem.  The page cache subsystem reads and writes a file a page
 ** at a time and provides a journal for rollback.
-** 这个头文件定义了一个SQLite缓存页面子系统的界面。这个页面缓存子系统读
+** 这个头文件定义了一个SQLite页面缓存子系统的界面。这个页面缓存子系统读
 ** 和写一个文件的一个页面并且提供了一个回滚的日志。
 */
 

@@ -48,8 +48,8 @@ typedef struct PGroup PGroup;
 */
 struct PGroup {
   sqlite3_mutex *mutex;          /* MUTEX_STATIC_LRU or NULL */								取值：MUTEX_STATIC_LRU 或 NULL
-  unsigned int nMaxPage;         /* Sum of nMax for MUTEX_STATIC_LRU or NULL caches */			
-  unsigned int nMinPage;         /* Sum of nMin for purgeable caches */
+  unsigned int nMaxPage;         /* Sum of nMax for MUTEX_STATIC_LRU or NULL caches */		
+  unsigned int nMinPage;         /* Sum of nMin for purgeable caches */						可清除的caches的所有nMin之和
   unsigned int mxPinned;         /* nMaxpage + 10 - nMinPage */								
   unsigned int nCurrentPage;     /* Number of purgeable pages allocated */					可清除的已分配的页面数
   PgHdr1 *pLruHead, *pLruTail;   /* LRU list of unpinned pages */							未钉住页面的LRU列表
@@ -81,7 +81,7 @@ struct PCache1 {
   /* Hash table of all pages. The following variables may only be accessed			所有页面的哈希表。以下变量可能仅仅在访问者持有PGroup mutex的时候被访问
   ** when the accessor is holding the PGroup mutex.
   */		
-  unsigned int nRecyclable;           /* Number of pages in the LRU list */			LRU列表中的页面数
+  unsigned int nRecyclable;           /* Number of pages in the LRU list */			LRU列表中的页面数(可回收利用的)
   unsigned int nPage;                 /* Total number of pages in apHash */			apHash中页面的总数
   unsigned int nHash;                 /* Number of slots in apHash[] */				apHash[]的槽的数量
   PgHdr1 **apHash;                    /* Hash table for fast lookup by key */		用于快速查找key的哈希表
@@ -141,6 +141,7 @@ static SQLITE_WSD struct PCacheGlobal {
 ** All code in this file should access the global structure above via the
 ** alias "pcache1". This ensures that the WSD emulation is used when
 ** compiling for systems that do not support real WSD.
+	该文件的所有代码应该访问上面的全局结构体（通过pcache1）。这保证当编译的目标系统不支持真正的WSD时，保证了WSD竞争被使用
 */
 #define pcache1 (GLOBAL(struct PCacheGlobal, pcache1_g))
 
@@ -161,6 +162,7 @@ static SQLITE_WSD struct PCacheGlobal {
 **
 ** This routine is called from sqlite3_initialize() and so it is guaranteed
 ** to be serialized already.  There is no need for further mutexing.
+	
 */
 void sqlite3PCacheBufferSetup(void *pBuf, int sz, int n){
   if( pcache1.isInit ){
