@@ -3620,10 +3620,10 @@ static int pagerOpentemp(
 ** retried. If it returns zero, then the SQLITE_BUSY error is
 ** returned to the caller of the pager API function.
 
-	如果sqlite3OsLock()在试图从no-lock升级到SHARE锁时，或者从RESERVED锁升级到EXCLUSIVE锁状态时返回SQILTE_BUSY，pager调用busy-handler。当从SHARED升级到RESERVED或从SHARE升级到EXCLUSIVE（热日志回滚发生），不调用忙处理
-	总结：
-	如上。
-	如果busy-handler回调返回非0，锁止用。如果返回0，SQLITE_BUSY错误返回给pager API函数调用者
+如果sqlite3OsLock()在试图从no-lock升级到SHARE锁时，或者从RESERVED锁升级到EXCLUSIVE锁状态时返回SQILTE_BUSY，pager调用busy-handler。当从SHARED升级到RESERVED或从SHARE升级到EXCLUSIVE（热日志回滚发生），不调用忙处理
+总结：
+如上。
+如果busy-handler回调返回非0，锁止用。如果返回0，SQLITE_BUSY错误返回给pager API函数调用者
 */
 void sqlite3PagerSetBusyhandler(
   Pager *pPager,                       /* Pager object */
@@ -3782,11 +3782,11 @@ void enable_simulated_io_errors(void){
 ** the error code is returned to the caller and the contents of the
 ** output buffer undefined.
 	
-	读取文件的头N个字节到内存那种，是的pDest指针指向文件头数据。
-	如果pager以临时一个临时文件打开（即用户为输入文件名），或者打开了一个小于N字节大小的文件，输出缓冲区被置零并返回SQLITE_OK。
-	该操作的基本原理：这个函数被用来读取数据库头，且一个新的临时或者置零的数据库有这样一个头：其大小大于整个文件大小
-	
-	如果除了SQLITE_IOERR_SHORT_READ 的其他IO错误码被命中，将其返回给调用者，且输出缓冲区的内容为未定义状态
+读取文件的头N个字节到内存那种，是的pDest指针指向文件头数据。
+如果pager以临时一个临时文件打开（即用户为输入文件名），或者打开了一个小于N字节大小的文件，输出缓冲区被置零并返回SQLITE_OK。
+该操作的基本原理：这个函数被用来读取数据库头，且一个新的临时或者置零的数据库有这样一个头：其大小大于整个文件大小
+
+如果除了SQLITE_IOERR_SHORT_READ 的其他IO错误码被命中，将其返回给调用者，且输出缓冲区的内容为未定义状态
 */
 int sqlite3PagerReadFileheader(Pager *pPager, int N, unsigned char *pDest){		N:100	pDest:"SQLite format 3"
   int rc = SQLITE_OK;
