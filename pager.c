@@ -4020,6 +4020,7 @@ Pgno sqlite3PagerPagenumber(DbPage *pPg){
 
 /*
 ** Increment the reference count for page pPg.
+对页面的引用进行递增
 */
 void sqlite3PagerRef(DbPage *pPg){
   sqlite3PcacheRef(pPg);
@@ -4308,6 +4309,7 @@ static int pager_write_pagelist(Pager *pPager, PgHdr *pList){
 ** SQLITE_OK is returned if everything goes according to plan. An 
 ** SQLITE_IOERR_XXX error code is returned if a call to sqlite3OsOpen() 
 ** fails.
+确保子日志文件处于打开状态，如果已经打开，什么都不做。
 */
 static int openSubJournal(Pager *pPager){
   int rc = SQLITE_OK;
@@ -4842,6 +4844,20 @@ int sqlite3PagerOpen(
 ** set to 0 and SQLITE_OK returned. If an IO error occurs while trying
 ** to determine whether or not a hot-journal file exists, the IO error
 ** code is returned and the value of *pExists is undefined.
+pager锁状态从PAGER_UNLOCK转换到PAGER_SHARED状态之后，该函数被调用。测试对于给定的pager，文件系统中是否存在热日志。
+热日志存在与否的判别标准：（and）
+日志文件在文件系统中
+没有进程持有数据库文件上的RESERVED或者更大的锁
+数据库文件本身的大小大于0字节
+日志文件的第一个字节存在且不为0x00
+
+如果数据库文件当前大小为0，但是日志文件存在，可能是上一个同名数据库遗留的日志。此时日志文件通过OsDelete删除，pExists设置为0，返回SQLITE_OK。
+
+该函数不检查文件末尾的master日志文件名。如果有并且master日志文件不存在，那么日志不是真正的热日志。这种情况下该函数返回一个false-positive。pager_playback()
+函数会发现该日志文件不是真正的热日志并且不会进行回滚。
+如果热日志文件存在并被发现，pExists设置为1并返回SQLITE_OK，不存在的话pExists设置为0。
+发生错误，返回错误码，pExists未定义
+
 */
 static int hasHotJournal(Pager *pPager, int *pExists){
   sqlite3_vfs * const pVfs = pPager->pVfs;
