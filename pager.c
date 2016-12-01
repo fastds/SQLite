@@ -749,8 +749,9 @@ static const unsigned char aJournalMagic[] = {
 #define JOURNAL_PG_SZ(pPager)  ((pPager->pageSize) + 8)							//给出了日志文件中每一个页面记录的大小
 
 /*
-** The journal header size for this pager. This is usually the same 			//pager的日志头的大小。通常和单独的磁盘扇区的大小一样
+** The journal header size for this pager. This is usually the same 			
 ** size as a single disk sector. See also setSectorSize().
+pager的日志头的大小。通常和单独的磁盘扇区的大小一样
 */
 #define JOURNAL_HDR_SZ(pPager) (pPager->sectorSize)
 
@@ -1078,23 +1079,24 @@ static int pagerUnlockDb(Pager *pPager, int eLock){
 }
 
 /*
-** Lock the database file to level eLock, which must be either SHARED_LOCK,			给数据库文件加锁，锁要么SHARED_LOCK,要么ESERVED_LOCK or EXCLUSIVE_LOCK
-** RESERVED_LOCK or EXCLUSIVE_LOCK. If the caller is successful, set the			如果调用成功，Pager.eLock状态被更新
+** Lock the database file to level eLock, which must be either SHARED_LOCK,			
+** RESERVED_LOCK or EXCLUSIVE_LOCK. If the caller is successful, set the			
 ** Pager.eLock variable to the new locking state. 
 **
-** Except, if Pager.eLock is set to UNKNOWN_LOCK when this function is 				若功能调用时，Pager.eLock被设置为UNKNOWN_LOCK。不对其进行修改，除非新的锁状态是EXCLUSIVE_LOCK
+** Except, if Pager.eLock is set to UNKNOWN_LOCK when this function is 				
 ** called, do not modify it unless the new locking state is EXCLUSIVE_LOCK. 
 ** See the comment above the #define of UNKNOWN_LOCK for an explanation 
 ** of this.
+给数据库文件加锁，锁要么SHARED_LOCK,要么RESERVED_LOCK or EXCLUSIVE_LOCK，如果调用成功，Pager.eLock状态被更新，若功能调用时，Pager.eLock被设置为UNKNOWN_LOCK。不对其进行修改，除非新的锁状态是EXCLUSIVE_LOCK
 */
 static int pagerLockDb(Pager *pPager, int eLock){
   int rc = SQLITE_OK;
 
   assert( eLock==SHARED_LOCK || eLock==RESERVED_LOCK || eLock==EXCLUSIVE_LOCK );
   if( pPager->eLock<eLock || pPager->eLock==UNKNOWN_LOCK ){							//状态值：UNKNOWN_LOCK > EXCLUSIVE_LOCK
-    rc = sqlite3OsLock(pPager->fd, eLock);
+    rc = sqlite3OsLock(pPager->fd, eLock);			调用OS层对数据库文件加锁
     if( rc==SQLITE_OK && (pPager->eLock!=UNKNOWN_LOCK||eLock==EXCLUSIVE_LOCK) ){	//(pPager->eLock!=UNKNOWN_LOCK||eLock==EXCLUSIVE_LOCK)在pPager->eLock为未知锁且新锁不是互斥锁的时候为假
-      pPager->eLock = (u8)eLock;
+      pPager->eLock = (u8)eLock;		更新所状态
       IOTRACE(("LOCK %p %d\n", pPager, eLock))
     }
   }
@@ -1102,21 +1104,27 @@ static int pagerLockDb(Pager *pPager, int eLock){
 }
 
 /*
-** This function determines whether or not the atomic-write optimization			确定atomic-write优化是否能被用于页面上。优化操作可能在如下情况下被使用：
+** This function determines whether or not the atomic-write optimization			
 ** can be used with this pager. The optimization can be used if:
 **
-**  (a) the value returned by OsDeviceCharacteristics() indicates that				1、OsDeviceCharacteristics()返回值，指示一个数据库页可能被原子写
-**      a database page may be written atomically, and								2、OsSectorSize()返回值<=页大小
+**  (a) the value returned by OsDeviceCharacteristics() indicates that				
+**      a database page may be written atomically, and								
 **  (b) the value returned by OsSectorSize() is less than or equal
 **      to the page size.
 **
-** The optimization is also always enabled for temporary files. It is			该优化对临时文件可用。付过pPager以内存数据库方式打开，返回错误。
+** The optimization is also always enabled for temporary files. It is			
 ** an error to call this function if pPager is opened on an in-memory
 ** database.
 **
-** If the optimization cannot be used, 0 is returned. If it can be used,		如果优化不能被使用，0返回，否则返回值是包含了一个具体页面的回滚数据的日志文件的大小
+** If the optimization cannot be used, 0 is returned. If it can be used,		
 ** then the value returned is the size of the journal file when it
 ** contains rollback data for exactly one page.
+
+确定atomic-write优化是否能被用于页面上。优化操作可能在如下情况下被使用：
+1、OsDeviceCharacteristics()返回值，指示一个数据库页可能被原子写
+2、OsSectorSize()返回值<=页大小
+该优化对临时文件可用。pPager以内存数据库方式打开，调用该函数时返回错误。
+如果优化不能被使用，0返回，否则返回值是包含了一个具体页面的回滚数据的日志文件的大小
 */
 #ifdef SQLITE_ENABLE_ATOMIC_WRITE
 static int jrnlBufferSize(Pager *pPager){
@@ -1186,9 +1194,9 @@ static void checkPage(PgHdr *pPg){
 #endif  /* SQLITE_CHECK_PAGES */
 
 /*
-** When this is called the journal file for pager pPager must be open.			该功能被调用时，Pager pPager必须是打开的。
-** This function attempts to read a master journal file name from the 			函数试图从日志文件中读取master journal文件名，
-** end of the file and, if successful, copies it into memory supplied 			如果成功读取，把它复制到主存中被调用者使用
+** When this is called the journal file for pager pPager must be open.			
+** This function attempts to read a master journal file name from the 			
+** end of the file and, if successful, copies it into memory supplied 			
 ** by the caller. See comments above writeMasterJournal() for the format
 ** used to store a master journal file name at the end of a journal file.
 **
@@ -1196,19 +1204,23 @@ static void checkPage(PgHdr *pPg){
 ** the caller. This should be sqlite3_vfs.mxPathname+1 (to ensure there is
 ** enough space to write the master journal name). If the master journal
 ** name in the journal is longer than nMaster bytes (including a
-** nul-terminator), then this is handled as if no master journal name			//如果参数中的master journal 名称长度大于最大路径长度，将该名称当做没有被传递进函数来处理
+** nul-terminator), then this is handled as if no master journal name			
 ** were present in the journal.
 **
-** If a master journal file name is present at the end of the journal			如果一个master journal 文件名读取出来后复制到zMaster指针指向的缓冲区中。一个终止符被加在结尾
+** If a master journal file name is present at the end of the journal			
 ** file, then it is copied into the buffer pointed to by zMaster. A
 ** nul-terminator byte is appended to the buffer following the master
 ** journal file name.
 **
-** If it is determined that no master journal file name is present 				如果没有master journal文件名被传送到,zMaster[0]被设置为0，并返回SQLITE_OK
+** If it is determined that no master journal file name is present 				
 ** zMaster[0] is set to 0 and SQLITE_OK returned.
 **
-** If an error occurs while reading from the journal file, an SQLite			发生错误则返回错误码
+** If an error occurs while reading from the journal file, an SQLite			
 ** error code is returned.
+该功能被调用时,Pager必须是打开的。函数试图从日志文件中读取master journal文件名，如果成功读取，把它复制到主存中被调用者使用。
+如果参数中的master journal 名称长度大于最大路径长度，将该名称当做没有被传递进函数来处理。
+如果一个master journal 文件名读取出来后复制到zMaster指针指向的缓冲区中。一个终止符被加在结尾
+如果没有master journal文件名被传送到,zMaster[0]被设置为0，并返回SQLITE_OK。发生错误则返回错误码
 */
 static int readMasterJournal(sqlite3_file *pJrnl, char *zMaster, u32 nMaster){// 读 master journal file name，存入zMaster
   int rc;                    /* Return code */
@@ -1249,7 +1261,7 @@ static int readMasterJournal(sqlite3_file *pJrnl, char *zMaster, u32 nMaster){//
 }
 
 /*
-** Return the offset of the sector boundary at or immediately 			//返回扇区边界的偏移量或者直接跟随pPager->journalOff中的值，假设一个pPager->sectorSiz的扇区
+** Return the offset of the sector boundary at or immediately 			
 ** following the value in pPager->journalOff, assuming a sector 
 ** size of pPager->sectorSize bytes.
 **
@@ -1261,13 +1273,14 @@ static int readMasterJournal(sqlite3_file *pJrnl, char *zMaster, u32 nMaster){//
 **   512                       512
 **   100                       512
 **   2000                      2048
+返回扇区边界的偏移量或者直接跟随pPager->journalOff中的值，假设一个pPager->sectorSize的扇区
 ** 
 */
 static i64 journalHdrOffset(Pager *pPager){					
   i64 offset = 0;
   i64 c = pPager->journalOff;
   if( c ){
-    offset = ((c-1)/JOURNAL_HDR_SZ(pPager) + 1) * JOURNAL_HDR_SZ(pPager);
+    offset = ((c-1)/JOURNAL_HDR_SZ(pPager) + 1) * JOURNAL_HDR_SZ(pPager);		JOURNAL_HDR_SZ==pPager->sectorSize
   }
   assert( offset%JOURNAL_HDR_SZ(pPager)==0 );
   assert( offset>=c );
@@ -1276,38 +1289,43 @@ static i64 journalHdrOffset(Pager *pPager){
 }
 
 /*
-** The journal file must be open when this function is called.					函数被调用时，日志必须是打开的。
+** The journal file must be open when this function is called.					
 **
-** This function is a no-op if the journal file has not been written to			如果在当前事务中，日志没有被写过（if Pager.journalOff==0），该函数什么事都不做。
+** This function is a no-op if the journal file has not been written to			
 ** within the current transaction (i.e. if Pager.journalOff==0).
 **
-** If doTruncate is non-zero or the Pager.journalSizeLimit variable is			doTruncate非0,或者 Pager.journalSizeLimit为0，将日志文件截短为0字节。否则，将日志文件开始的28-byte header归零。
+** If doTruncate is non-zero or the Pager.journalSizeLimit variable is			
 ** set to 0, then truncate the journal file to zero bytes in size. Otherwise,
-** zero the 28-byte header at the start of the journal file. In either case, 	不论哪种情况，如果pager不处于no-sync mode，在写或者截短日志之后立刻同步日志文件。
+** zero the 28-byte header at the start of the journal file. In either case, 	
 ** if the pager is not in no-sync mode, sync the journal file immediately 
 ** after writing or truncating it.
 **
-** If Pager.journalSizeLimit is set to a positive, non-zero value, and			如果Pager.journalSizeLimit被设置为>0的数,并且对日志文件中的归零或者截短字节大小大于这个值，
-** following the truncation or zeroing described above the size of the 			则截短日志文件为Pager.journalSizeLimit 字节。该操作后，日志文件无需被同步
+** If Pager.journalSizeLimit is set to a positive, non-zero value, and			
+** following the truncation or zeroing described above the size of the 			
 ** journal file in bytes is larger than this value, then truncate the
 ** journal file to Pager.journalSizeLimit bytes. The journal file does
 ** not need to be synced following this operation.
 **
-** If an IO error occurs, abandon processing and return the IO error code.		如果发生IO错误，不处理，只返回IO错误码，否则，返回SQLITE_OK
+** If an IO error occurs, abandon processing and return the IO error code.		
 ** Otherwise, return SQLITE_OK.
+函数被调用时，日志必须是打开的。如果在当前事务中，日志没有被写过（Pager.journalOff==0），该函数什么事都不做。
+doTruncate非0,或者 Pager.journalSizeLimit为0，将日志文件截短为0字节。否则，将日志文件开始的28-byte header置零。
+不论哪种情况，如果pager不处于no-sync mode，在写或者截短日志之后立刻同步日志文件。
+如果Pager.journalSizeLimit被设置为>0的数,并且对日志文件中的归零或者截短字节大小大于这个值，则截短日志文件为Pager.journalSizeLimit 字节。该操作后，日志文件无需被同步
+如果发生IO错误，不处理，只返回IO错误码，否则，返回SQLITE_OK
 */
 static int zeroJournalHdr(Pager *pPager, int doTruncate){
   int rc = SQLITE_OK;                               /* Return code */
   assert( isOpen(pPager->jfd) );
   if( pPager->journalOff ){
-    const i64 iLimit = pPager->journalSizeLimit;    /* Local cache of jsl */
+    const i64 iLimit = pPager->journalSizeLimit;    /* Local cache of jsl */			本地的jsl缓冲
 
     IOTRACE(("JZEROHDR %p\n", pPager))
     if( doTruncate || iLimit==0 ){
       rc = sqlite3OsTruncate(pPager->jfd, 0);
     }else{
       static const char zeroHdr[28] = {0};
-      rc = sqlite3OsWrite(pPager->jfd, zeroHdr, sizeof(zeroHdr), 0);
+      rc = sqlite3OsWrite(pPager->jfd, zeroHdr, sizeof(zeroHdr), 0);		将日志头置零
     }
     if( rc==SQLITE_OK && !pPager->noSync ){
       rc = sqlite3OsSync(pPager->jfd, SQLITE_SYNC_DATAONLY|pPager->syncFlags);
@@ -1318,6 +1336,7 @@ static int zeroJournalHdr(Pager *pPager, int doTruncate){
     ** the persistent journal and the journal file currently consumes more
     ** space than that limit allows for, truncate it now. There is no need
     ** to sync the file following this operation.
+	此时，事物已经被提交，但是写锁依然被该文件持有。如果对持有日志而言存在大小限制的配置，现在进行截断，该操作之后无需同步
     */
     if( rc==SQLITE_OK && iLimit>0 ){
       i64 sz;
@@ -1331,11 +1350,11 @@ static int zeroJournalHdr(Pager *pPager, int doTruncate){
 }
 
 /*
-** The journal file must be open when this routine is called. A journal				调用该函数，日志文件必须打开状态。一个日志文件头（JOURNAL_HDR_SZ bytes）被写到日志文件中at the current location
+** The journal file must be open when this routine is called. A journal				
 ** header (JOURNAL_HDR_SZ bytes) is written into the journal file at the
 ** current location.
 **
-** The format for the journal header is as follows:									journal头的格式如下：
+** The format for the journal header is as follows:									
 ** - 8 bytes: Magic identifying journal format.										Magic标识的日志格式
 ** - 4 bytes: Number of records in journal, or -1 no-sync mode is on.				日志中的记录数，-1表示开启的是no-sync mode
 ** - 4 bytes: Random number used for page hash.										页面哈希使用的随机数
@@ -1344,18 +1363,27 @@ static int zeroJournalHdr(Pager *pPager, int doTruncate){
 ** - 4 bytes: Database page size.													数据库页面大小
 ** 
 ** Followed by (JOURNAL_HDR_SZ - 28) bytes of unused space.							后接(JOURNAL_HDR_SZ - 28)字节字节的未使用空间
+调用该函数，日志文件必须打开状态。一个日志文件头（JOURNAL_HDR_SZ bytes）被写到日志文件中at the current location
+journal头的格式如下：
+** The format for the journal header is as follows:									
+** - 8 bytes: Magic identifying journal format.										Magic标识的日志格式
+** - 4 bytes: Number of records in journal, or -1 no-sync mode is on.				日志中的记录数，-1表示开启的是no-sync mode
+** - 4 bytes: Random number used for page hash.										页面哈希使用的随机数
+** - 4 bytes: Initial database page count.											最初的数据库页面数
+** - 4 bytes: Sector size used by the process that wrote this journal.				写该日志的进程使用的扇区大小
+** - 4 bytes: Database page size.													数据库页面大小
 */
 static int writeJournalHdr(Pager *pPager){
   int rc = SQLITE_OK;                 /* Return code */
   char *zHeader = pPager->pTmpSpace;  /* Temporary space used to build header */	//用于构建日志头部的临时空间
-  u32 nHeader = (u32)pPager->pageSize;/* Size of buffer pointed to by zHeader */	//zHeader指向的缓冲区的大小
+  u32 nHeader = (u32)pPager->pageSize;/* Size of buffer pointed to by zHeader */	//zHeader指向的缓冲区的大小（一个页面的大小1024）
   u32 nWrite;                         /* Bytes of header sector written */			//被写的扇区头的字节数
   int ii;                             /* Loop counter */							//循环变量
 
   assert( isOpen(pPager->jfd) );      /* Journal file must be open. */
 
-  if( nHeader>JOURNAL_HDR_SZ(pPager) ){
-    nHeader = JOURNAL_HDR_SZ(pPager);
+  if( nHeader>JOURNAL_HDR_SZ(pPager) ){				
+    nHeader = JOURNAL_HDR_SZ(pPager);				JOURNAL_HDR_SZ  == 扇区大小
   }
 
   /* If there are active savepoints and any of them were created 		如果存在活动的保存点并且它们在最近的文件头被写之后被创建，则更新 PagerSavepoint.iHdrOffset
@@ -1378,7 +1406,7 @@ static int writeJournalHdr(Pager *pPager){
   ** of records (see syncJournal()).
   **
   ** A faster alternative is to write 0xFFFFFFFF to the nRec field. When		另一个对于nRec可选写入值0xFFFFFFFF。当读取日志是，这个值告诉SQLite去假设剩下的日志文件包含有效的页面记录。
-  ** reading the journal this value tells SQLite to assume that the				这个假设是危险的，就好当对可能包含垃圾数据的日志文件进行写操作时，一个错误发生。由两个方案可以让这个风险被忽略：
+  ** reading the journal this value tells SQLite to assume that the				这个假设是危险的，就好像日志文件进行写操作时可能包含垃圾数据，一个错误发生。由两个方案可以让这个风险被忽略：
   ** rest of the journal file contains valid page records. This assumption
   ** is dangerous, as if a failure occurred whilst writing to the journal
   ** file it may contain some garbage data. There are two scenarios
@@ -1415,6 +1443,8 @@ static int writeJournalHdr(Pager *pPager){
   ** works find if the following memset() is omitted.  But initializing
   ** the memory prevents valgrind from complaining, so we are willing to
   ** take the performance hit.
+  对日志尾部未使用的缓冲区进行初始化是不必要的。就算忽略掉后面的内容有效的内容都能被找到，。但是这样的初始化操作能够避免valgrind（内存调试、内存泄漏检测、性能分析工具）
+  检测报告问题。宁愿损失一点性能
   */
   memset(&zHeader[sizeof(aJournalMagic)+20], 0,
          nHeader-(sizeof(aJournalMagic)+20));
@@ -1435,6 +1465,10 @@ static int writeJournalHdr(Pager *pPager){
   ** database page size. Since the zHeader buffer is only Pager.pageSize
   ** bytes in size, more than one call to sqlite3OsWrite() may be required
   ** to populate the entire journal header sector.
+  理论上，只需要对日志使用的28个header字节进行写入。当通过JOURNAL_HDR_SZ递增Pager.journalOff，以便下一条记录被写到后面的扇区中（在文件中存留的间隙会被OS隐含填充）
+  然而发现在某些操作系统上，该模式在连续将数据写入文件时会造成速度的明显下降，即使将数据隐含写入(JOURNAL_HDR_SZ - 28)的字节块不会被使用。？？
+  在sector-size大于数据库页面大小的时候，需要进行下面的循环操作。因为zHeader缓冲区仅仅只有Pager.pageSize字节大小，所有可能需要对sqlite3OsWrite()进行多次调用，来
+  填充整个日志头扇区。
   */ 
   for(nWrite=0; rc==SQLITE_OK&&nWrite<JOURNAL_HDR_SZ(pPager); nWrite+=nHeader){
     IOTRACE(("JHDR %p %lld %d\n", pPager, pPager->journalHdr, nHeader))
@@ -1447,21 +1481,25 @@ static int writeJournalHdr(Pager *pPager){
 }
 
 /*
-** The journal file must be open when this is called. A journal header file					//调用该方法，日志必须被打开。
-** (JOURNAL_HDR_SZ bytes) is read from the current location in the journal					//日志头文件(JOURNAL_HDR_SZ bytes)从日志文件的当前位置读出，日志文件的当前位置由pPager->journalOff给出。见上述功能writeJournalHdr()
-** file. The current location in the journal file is given by								对日志头格式的描述。
+** The journal file must be open when this is called. A journal header file					//
+** (JOURNAL_HDR_SZ bytes) is read from the current location in the journal					//
+** file. The current location in the journal file is given by								
 ** pPager->journalOff. See comments above function writeJournalHdr() for
 ** a description of the journal header format.
 **
-** If the header is read successfully, *pNRec is set to the number of						如果成功读取头部， *pNRec 被设置为页面记录的数量，并且*pDbSize被设置为在事务开始前数据库的大小，以页为单位。
-** page records following this header and *pDbSize is set to the size of the				pPager->cksumInit被设置的值来自于对日志头的读取。这种情况下，SQLITE_OK被返回
+** If the header is read successfully, *pNRec is set to the number of						
+** page records following this header and *pDbSize is set to the size of the				
 ** database before the transaction began, in pages. Also, pPager->cksumInit			
 ** is set to the value read from the journal header. SQLITE_OK is returned
 ** in this case.
 **
-** If the journal header file appears to be corrupted, SQLITE_DONE is						如果日志头文件崩溃，SQLITE_DONE被返回，并且*pNRec 和 *PDbSize未被定义。如果 JOURNAL_HDR_SZ个字节不能从日志文件中读取，将返回错误码
+** If the journal header file appears to be corrupted, SQLITE_DONE is						
 ** returned and *pNRec and *PDbSize are undefined.  If JOURNAL_HDR_SZ bytes
 ** cannot be read from the journal file an error code is returned.
+调用该方法，日志必须被打开。日志头文件(JOURNAL_HDR_SZ bytes)从日志文件的当前位置读出，日志文件的当前位置由pPager->journalOff给出。见上述功能writeJournalHdr()。
+对日志头格式的描述。如果成功读取头部， *pNRec 被设置为页面记录的数量，并且*pDbSize被设置为在事务开始前数据库的大小，以页为单位。
+pPager->cksumInit被设置的值来自于对日志头的读取。这种情况下，SQLITE_OK被返回。
+如果日志头文件崩溃，SQLITE_DONE被返回，并且*pNRec 和 *PDbSize未被定义。如果 JOURNAL_HDR_SZ个字节不能从日志文件中读取，将返回错误码
 */
 static int readJournalHdr(
   Pager *pPager,               /* Pager object */
@@ -1570,8 +1608,8 @@ static int readJournalHdr(
 
 
 /*
-** Write the supplied master journal name into the journal file for pager				将提供的master journal名写到pager pPager日志文件的当前位置。master journal 名必须是最后一个被写入日志文件的内容。
-** pPager at the current location. The master journal name must be the last				如果pager处于full-sync模式，journal文件被描述符在任何东西被写入时先进入下一个扇区的边界。这个格式是：
+** Write the supplied master journal name into the journal file for pager				
+** pPager at the current location. The master journal name must be the last				
 ** thing written to a journal file. If the pager is in full-sync mode, the
 ** journal file descriptor is advanced to the next sector boundary before
 ** anything is written. The format is:
@@ -1579,14 +1617,18 @@ static int readJournalHdr(
 **   + 4 bytes: PAGER_MJ_PGNO.						从未使用过										
 **   + N bytes: Master journal filename in utf-8.
 **   + 4 bytes: N (length of master journal name in bytes, no nul-terminator).
-**   + 4 bytes: Master journal name checksum.											master journal 名字的校验和
+**   + 4 bytes: Master journal name checksum.											
 **   + 8 bytes: aJournalMagic[].
 **
-** The master journal page checksum is the sum of the bytes in the master				master-journal 页面蕉叶和就是master journal name每个字节的和，这些字节被解释为一个8-bit有符号整数
+** The master journal page checksum is the sum of the bytes in the master				
 ** journal name, where each byte is interpreted as a signed 8-bit integer.
 **
-** If zMaster is a NULL pointer (occurs for a single database transaction), 		zMaster为NULL(occurs for a single database transaction)，本调用无操作
+** If zMaster is a NULL pointer (occurs for a single database transaction), 		
 ** this call is a no-op.
+将提供的master journal名写到pager pPager日志文件的当前位置（对日志文件header写入）。master journal 名必须是最后一个被写入日志文件的内容。
+如果pager处于full-sync模式，journal文件描述符在被写入之前进入下一个扇区的边界。这个格式是如上。master journal 名字的校验和
+master-journal 页面校验和就是master journal name每个字节的和，这些字节被解释为一个8-bit有符号整数
+zMaster为NULL(occurs for a single database transaction)，本调用无操作
 */
 static int writeMasterJournal(Pager *pPager, const char *zMaster){
   int rc;                          /* Return code */
@@ -1622,7 +1664,7 @@ static int writeMasterJournal(Pager *pPager, const char *zMaster){
   }
   iHdrOff = pPager->journalOff;
 
-  /* Write the master journal data to the end of the journal file. If					//写master journal数据到数据文件的尾部。如果发生错误则返回错误码给调用者
+  /* Write the master journal data to the end of the journal file. If					//写master journal数据到数据文件的末尾。如果发生错误则返回错误码给调用者
   ** an error occurs, return the error code to the caller.
   */
   if( (0 != (rc = write32bits(pPager->jfd, iHdrOff, PAGER_MJ_PGNO(pPager))))
@@ -1635,7 +1677,7 @@ static int writeMasterJournal(Pager *pPager, const char *zMaster){
   }
   pPager->journalOff += (nMaster+20);
 
-  /* If the pager is in peristent-journal mode, then the physical 						//如果pager处于peristent-journal模式，那么无力的日志文件可能扩展到master-journal 名之后
+  /* If the pager is in peristent-journal mode, then the physical 						//如果pager处于peristent-journal模式，那么物理的日志文件可能扩展到master-journal 名之后
   ** journal-file may extend past the end of the master-journal name					并且8字节的magic数据被写到文件。这是危险的因为回滚一个热日志文件的代码将找不到master-journal名去确定是否是热日志
   ** and 8 bytes of magic data just written to the file. This is 
   ** dangerous because the code to rollback a hot-journal file
@@ -1673,7 +1715,7 @@ static PgHdr *pager_lookup(Pager *pPager, Pgno pgno){
 ** Discard the entire contents of the in-memory page-cache.		
 		丢弃内存中page-cache的全部内容		
 */
-static void pager_reset(Pager *pPager){		备份后在清空
+static void pager_reset(Pager *pPager){		备份后再清空
   sqlite3BackupRestart(pPager->pBackup);
   sqlite3PcacheClear(pPager->pPCache);
 }
@@ -1699,9 +1741,11 @@ static void releaseAllSavepoints(Pager *pPager){
 }
 
 /*
-** Set the bit number pgno in the PagerSavepoint.pInSavepoint 					设置PagerSavepoint.pInSavepoint 中所有打开的保存点的bitvecs中的bit number pgno
-** bitvecs of all open savepoints. Return SQLITE_OK if successful				成功返回SQLITE_OK，如果内存分配失败返回SQLITE_NOMEM
+** Set the bit number pgno in the PagerSavepoint.pInSavepoint 					
+** bitvecs of all open savepoints. Return SQLITE_OK if successful				
 ** or SQLITE_NOMEM if a malloc failure occurs.
+设置PagerSavepoint.pInSavepoint 中所有打开的保存点的bitvecs中的bit number pgno，
+成功返回SQLITE_OK，如果内存分配失败返回SQLITE_NOMEM
 */
 static int addToSavepointBitvecs(Pager *pPager, Pgno pgno){
   int ii;                   /* Loop counter */
@@ -1858,57 +1902,75 @@ static int pager_error(Pager *pPager, int rc){
 }
 
 /*
-** This routine ends a transaction. A transaction is usually ended by 		该函数结束一个事务。一个事务通常来说，被一个COMMIT或者ROLLBACK操作结束。这个函数可能在热日志的回滚之后被调用，或者如果错误发生在打开日志文件或者写
-** either a COMMIT or a ROLLBACK operation. This routine may be called 		一个数据库事务当中的最初的journal-header时
+** This routine ends a transaction. A transaction is usually ended by 		
+** either a COMMIT or a ROLLBACK operation. This routine may be called 		
 ** after rollback of a hot-journal, or if an error occurs while opening
 ** the journal file or writing the very first journal-header of a
 ** database transaction.
 ** 
-** This routine is never called in PAGER_ERROR state. If it is called		这个函数不会在PAGER_ERROR状态被调用，如果在PAGER_NONE or PAGER_SHARED状态被调用，并且持有的锁低于RESERVED锁，它将不做任何操作
+** This routine is never called in PAGER_ERROR state. If it is called		
 ** in PAGER_NONE or PAGER_SHARED state and the lock held is less
 ** exclusive than a RESERVED lock, it is a no-op.
 **
-** Otherwise, any active savepoints are released.							否则，任何保存点都被释放。
+** Otherwise, any active savepoints are released.							
 **
-** If the journal file is open, then it is "finalized". Once a journal 		如果日志文件是打开的，那么它被“finalized”. 一旦一个日志文件被finalized，它可能用它回滚一个事务。它不会被数据库连接认为是一个热日志。
-** file has been finalized it is not possible to use it to roll back a 		一个日志具体如何被finalize取决于pager是否运行于互斥模式和当前journal-mode (Pager.journalMode value)，如下所示：
+** If the journal file is open, then it is "finalized". Once a journal 		
+** file has been finalized it is not possible to use it to roll back a 		
 ** transaction. Nor will it be considered to be a hot-journal by this
 ** or any other database connection. Exactly how a journal is finalized
 ** depends on whether or not the pager is running in exclusive mode and
 ** the current journal-mode (Pager.journalMode value), as follows:
 **
-**   journalMode==MEMORY													journalMode==MEMORY
-**     Journal file descriptor is simply closed. This destroys an 			日志文件描述符被关闭。这销毁了一个内存日志
+**   journalMode==MEMORY													
+**     Journal file descriptor is simply closed. This destroys an 			
 **     in-memory journal.
 **
-**   journalMode==TRUNCATE													journalMode==TRUNCATE
-**     Journal file is truncated to zero bytes in size.						日志文件大小被截断为0字节
+**   journalMode==TRUNCATE													
+**     Journal file is truncated to zero bytes in size.						
 **
-**   journalMode==PERSIST													journalMode==PERSIST
-**     The first 28 bytes of the journal file are zeroed. This invalidates	日志文件的头28字节被置0。这是的文件中的第一个日志头变为无效，整个日志文件也是如此。一个无效的日志文件不能被回滚。
+**   journalMode==PERSIST													
+**     The first 28 bytes of the journal file are zeroed. This invalidates	
 **     the first journal header in the file, and hence the entire journal
 **     file. An invalid journal file cannot be rolled back.
 **
-**   journalMode==DELETE													journalMode==DELETE
-**     The journal file is closed and deleted using sqlite3OsDelete().		日志文件被关闭和删除（用sqliteOsDelete()）
+**   journalMode==DELETE													
+**     The journal file is closed and deleted using sqlite3OsDelete().		
 **
-**     If the pager is running in exclusive mode, this method of finalizing	如果pager在互斥模式下运行，这个finalizing日志的方法不会被使用,取而代之的如果journalMode是DELETE并且pager处于exclusive模式,这个方法
-**     the journal file is never used. Instead, if the journalMode is		在journalMode==PERSIST 模式下被使用
+**     If the pager is running in exclusive mode, this method of finalizing	
+**     the journal file is never used. Instead, if the journalMode is		
 **     DELETE and the pager is in exclusive mode, the method described under
 **     journalMode==PERSIST is used instead.
 **
-** After the journal is finalized, the pager moves to PAGER_READER state.	在日志文件被finalize之后,pager变为journalMode==READER状态.如果运行于非互斥的回滚模式下,文件上的锁被降级为共享锁
+** After the journal is finalized, the pager moves to PAGER_READER state.	
 ** If running in non-exclusive rollback mode, the lock on the file is 
 ** downgraded to a SHARED_LOCK.
 **
-** SQLITE_OK is returned if no error occurs. If an error occurs during		如果没有错误发生,SQLITE_OK返回.如果错误发射给你在任何对日志文件finalize的IO操作期间或者解锁数据库期间,那么IO错误码将被返回给用户.
-** any of the IO operations to finalize the journal file or unlock the		如果finalize日志文件的操作失败了,那么代码试图解锁数据库文件如果当前状态不在互斥模式下,解锁操作失败,那么和第一个错误发生时的第一个错误码被返回
+** SQLITE_OK is returned if no error occurs. If an error occurs during		
+** any of the IO operations to finalize the journal file or unlock the		
 ** database then the IO error code is returned to the user. If the 
 ** operation to finalize the journal file fails, then the code still
 ** tries to unlock the database file if not in exclusive mode. If the
 ** unlock operation fails as well, then the first error code related
 ** to the first error encountered (the journal finalization one) is
 ** returned.
+该函数结束一个事务。一个事务通常来说，被一个COMMIT或者ROLLBACK操作结束。这个函数可能在热日志的回滚之后被调用，或者如果错误发生在打开日志文件或者写
+一个数据库事务当中的最初的journal-header时。
+这个函数不会在PAGER_ERROR状态被调用，如果在PAGER_NONE or PAGER_SHARED状态被调用，并且持有的锁低于RESERVED锁，它将不做任何操作。
+否则，任何保存点都被释放。
+如果日志文件是打开的，那么它被“finalized”. 一旦一个日志文件被finalized，它可能用它回滚一个事务。它不会被数据库连接认为是一个热日志。
+一个日志具体如何被finalize取决于pager是否运行于互斥模式和当前journal-mode (Pager.journalMode value)，如下所示：
+journalMode==MEMORY
+日志文件描述符被关闭。这销毁了一个内存日志
+journalMode==TRUNCATE
+日志文件大小被截断为0字节
+journalMode==PERSIST
+日志文件的头28字节被置0。这是的文件中的第一个日志头变为无效，整个日志文件也是如此。一个无效的日志文件不能被回滚。
+journalMode==DELETE
+日志文件被关闭和删除（用sqliteOsDelete()）
+如果pager在互斥模式下运行，这个finalizing日志的方法不会被使用,取而代之的如果journalMode是DELETE并且pager处于exclusive模式,这个方法在journalMode==PERSIST 模式下被使用
+在日志文件被finalize之后,pager变为journalMode==READER状态.如果运行于非互斥的回滚模式下,文件上的锁被降级为共享锁.
+如果没有错误发生,SQLITE_OK返回.如果错误发射给你在任何对日志文件finalize的IO操作期间或者解锁数据库期间,那么IO错误码将被返回给用户.
+如果finalize日志文件的操作失败了,那么代码试图解锁数据库文件如果当前状态不在互斥模式下,解锁操作失败,那么和第一个错误发生时的第一个错误码被返回
 */
 static int pager_end_transaction(Pager *pPager, int hasMaster){
   int rc = SQLITE_OK;      /* Error code from journal finalization operation */		来自日志finalization操作的错误码
@@ -2061,6 +2123,11 @@ static void pagerUnlockAndRollback(Pager *pPager){
 ** It is much less likely that the two ends of the journal record will be
 ** correct and the middle be corrupt.  Thus, this "checksum" scheme,
 ** though fast and simple, catches the mostly likely kind of corruption.
+参数aData必须指向pPager-> pageSize字节的缓冲区中的数据。 计算并返回基于的数据页内容的校验和和pPager-> cksumInit的当前值。
+这不是一个真正的校验和。 它只是总和随机初始值（pPager-> cksumInit）和每200个字节的页面数据，从字节偏移（pPager-> pageSize％200）开始。每个字节被解释为8位无符号整数。
+更改用于计算此校验和的公式将导致不兼容的日志文件格式。
+如果日志崩溃是由于电源故障，最可能的方案是记录的一端或另一端将被改变。
+它不太可能是日志记录的两端正确，而中间崩溃。 因此，这种“校验和”方案，虽然快速和简单，但是可以捕捉可能性最大的损坏
 */
 static u32 pager_cksum(Pager *pPager, const u8 *aData){
   u32 cksum = pPager->cksumInit;         /* Checksum value to return */
@@ -2075,6 +2142,7 @@ static u32 pager_cksum(Pager *pPager, const u8 *aData){
 /*
 ** Report the current page size and number of reserved bytes back
 ** to the codec.
+将当前页大小和保留字节数报告回编解码器。
 */
 #ifdef SQLITE_HAS_CODEC
 static void pagerReportSize(Pager *pPager){
@@ -2123,6 +2191,17 @@ static void pagerReportSize(Pager *pPager){
 ** If this is a savepoint rollback, then memory may have to be dynamically
 ** allocated by this function. If this is the case and an allocation fails,
 ** SQLITE_NOMEM is returned.
+从日志文件中读取单个页面（如果isMainJrnl == 1）或
+从子日记（如果isMainJrnl == 0）并回放该页。页面从文件中偏移量pOffset处开始。 * pOffset值增加到日志中下一页的开始。
+main 回滚日志使用校验和-statement日志不使用。
+如果pDone不为NULL，那么它是已经回放的页面的记录。 如果pOffset处的页面已经回放（如果相应的pDone位置1），然后跳过回放。确保返回前设置了与pOffset页对应的pDone位。
+如果从（子）日志文件成功读取了页面记录并回放，然后返回SQLITE_OK。 如果同时从（子）日志文件读取记录或在写入到数据库文件时发生IO错误，然后返回IO错误代码。 如果数据
+已从（子）日志文件成功读取，但似乎是损坏的，返回SQLITE_DONE。 数据被视为已损坏
+两种情况（或者）：
+*如果记录的页码非法（0 or PAGER_MJ_PGNO）
+*如果记录从main 日志文件中被回滚并且checksum域与记录内容不匹配
+在保存点回滚期间以上两种情况可能都不发生。
+如果是一个savepoint回滚，主存可能由函数被动态分配。这种情况下分配失败，返回SQLITE_NOMEM
 */
 static int pager_playback_one_page(
   Pager *pPager,                /* The pager being played back */
@@ -2498,6 +2577,11 @@ delmaster_out:
 **
 ** If successful, return SQLITE_OK. If an IO error occurs while modifying
 ** the database file, return the error code to the caller.
+该函数用来改变文件系统中数据库文件的实际大小。这仅仅发生在一个事务的提交或者回滚操作期间（包括一个热日志的回滚）
+如果主数据库文件未打开，pager状态部位OPEN或者DBMOD，该函数什么都不做。否则，文件大小被改变为nPage页(nPage*pPager->pageSize bytes)。如果磁盘上的文件当前大于
+nPage页，使用VFS xTruncate()方法截断。
+或者，磁盘上的文件小于nPage页。如果试图截断文件为某个大于它当前大小，一些操作系统会混乱，所以这种情况要需要进行检测并将一个单独的0字节写到新文件的末尾。
+根据操作结果返回结果码
 */
 static int pager_truncate(Pager *pPager, Pgno nPage){
   int rc = SQLITE_OK;
@@ -2588,7 +2672,7 @@ static void setSectorSize(Pager *pPager){
 }
 
 /*
-** Playback the journal and thus restore the database file to						重放日志并恢复数据库文件
+** Playback the journal and thus restore the database file to						
 ** the state it was in before we started making changes.  
 **
 ** The journal file format is as follows: 
@@ -2643,6 +2727,27 @@ static void setSectorSize(Pager *pPager){
 ** If the journal really is hot, reset the pager cache prior rolling
 ** back any content.  If the journal is merely persistent, no reset is
 ** needed.
+重放日志并恢复数据库文件。
+日志文件格式如下：
+（1）8字节前缀。 aJournalMagic []的副本。
+（2）4字节的big-endian整数，它是日志中有效页记录的数量。 如果此值为0xffffffff，则从日志大小计算页面记录数。
+（3）4字节的big-endian整数，它是完整性校验和初始值。
+（4）4字节整数，即要截断的页面数数据库到回滚期间。
+（5）4字节的大端整数，即扇区大小。header是这个许多字节大小。
+（6）4字节的大端整数，即页大小。
+（7）零填充到下一扇区大小。
+（8）零个或多个页面实例，每个实例如下：
+       + 4字节页码。
+       + pPager-> pageSize字节的数据。
+       + 4字节校验和
+当我们谈到日志头时，我们是指上面的前7个项目。日志中的每个条目都是第8个项目的实例。
+从第二个项目符号“nRec”调用该值。 nRec是个数
+日志中的有效页条目。 在大多数情况下，您可以从日志文件的大小计算nRec的值。 但如果电源失效发生在日志正在写的过程中，它可能是
+这种情况：日志文件的大小已经增加，但是额外的条目还没有安全到磁盘。 在这种情况下，从文件大小计算的nRec的值将会过大。 对于那个原因，我们总是使用头中的nRec值。
+
+如果nRec值为0xffffffff，则意味着应该从文件大小计算nRec。 该值在用户选择时使用日志的no-sync选项。在这种情况下电源故障可能导致损坏。但对于像临时表（电源恢复时
+删除）我们不在乎。如果作为日志文件打开的文件不是格式正确的日志文件，则滚动到第一个损坏页面之前的所有页面（如果日志头损坏，则没有页）。 删除日志文件并返回SQLITE_OK，就好像没有遇到损坏。
+如果发生I / O或malloc（）错误，则不会删除日志文件并返回错误代码。
 */
 static int pager_playback(Pager *pPager, int isHot){
   sqlite3_vfs *pVfs = pPager->pVfs;
@@ -2844,6 +2949,8 @@ end_playback:
 **
 ** If an IO error occurs, then the IO error is returned to the caller.
 ** Otherwise, SQLITE_OK is returned.
+从数据库文件读取页面聂荣到pPg，并写到pPg->pData中。该功能调用前，需要持有数据库文件上的共享锁或者更大的锁。
+如果页面1被都去，那么Pager.dbFileVers[]的值被设置为从数据库文件中读取到的值。根据操作结果返回结果码
 */
 static int readDbPage(PgHdr *pPg){
   Pager *pPager = pPg->pPager; /* Pager object associated with page pPg */
@@ -2911,6 +3018,9 @@ static int readDbPage(PgHdr *pPg){
 ** This is an unconditional update.  See also the pager_incr_changecounter()
 ** routine which only updates the change-counter if the update is actually
 ** needed, as determined by the pPager->changeCountDone state variable.
+更新在header中在偏移量24和92出的change-counter和96处的sqlite版本号。
+该操作为无条件的更新操作。见pager_incr_changecounter()，该函数只在实际需要的时候更新change-counter，更新与否根据pPager-changeCountDone状态变量来确定
+
 */
 static void pager_write_changecounter(PgHdr *pPg){
   u32 change_counter;
@@ -2938,6 +3048,7 @@ static void pager_write_changecounter(PgHdr *pPg){
 ** references, the page content is reloaded from the database. If the
 ** attempt to reload content from the database is required and fails, 
 ** return an SQLite error code. Otherwise, SQLITE_OK.
+
 */
 static int pagerUndoCallback(void *pCtx, Pgno iPg){
   int rc = SQLITE_OK;
@@ -3107,6 +3218,8 @@ static int pagerBeginReadTransaction(Pager *pPager){
 ** If no error occurs, SQLITE_OK is returned and the size of the database
 ** in pages is stored in *pnPage. Otherwise, an error code (perhaps
 ** SQLITE_IOERR_FSTAT) is returned and *pnPage is left unmodified.
+当pager状态从PAGER_OPEN转换为PAGER_READER时，该函数作为转换过程中的部分内容用来确定数据库文件的页面数的大小（假设当前页面大小存储在Pager.pageSize中）。
+操作成功将页面数量设置到第二个参数中，否则保持其内容不变
 */
 static int pagerPagecount(Pager *pPager, Pgno *pnPage){
   Pgno nPage;                     /* Value to return via *pnPage */
@@ -3507,10 +3620,10 @@ static int pagerOpentemp(
 ** retried. If it returns zero, then the SQLITE_BUSY error is
 ** returned to the caller of the pager API function.
 
-	如果sqlite3OsLock()在试图从no-lock升级到SHARE锁时，或者从RESERVED锁升级到EXCLUSIVE锁状态时返回SQILTE_BUSY，pager调用busy-handler。当从SHARED升级到RESERVED或从SHARE升级到EXCLUSIVE（热日志回滚发生），不调用忙处理
-	总结：
-	如上。
-	如果busy-handler回调返回非0，锁止用。如果返回0，SQLITE_BUSY错误返回给pager API函数调用者
+如果sqlite3OsLock()在试图从no-lock升级到SHARE锁时，或者从RESERVED锁升级到EXCLUSIVE锁状态时返回SQILTE_BUSY，pager调用busy-handler。当从SHARED升级到RESERVED或从SHARE升级到EXCLUSIVE（热日志回滚发生），不调用忙处理
+总结：
+如上。
+如果busy-handler回调返回非0，锁止用。如果返回0，SQLITE_BUSY错误返回给pager API函数调用者
 */
 void sqlite3PagerSetBusyhandler(
   Pager *pPager,                       /* Pager object */
@@ -3669,11 +3782,11 @@ void enable_simulated_io_errors(void){
 ** the error code is returned to the caller and the contents of the
 ** output buffer undefined.
 	
-	读取文件的头N个字节到内存那种，是的pDest指针指向文件头数据。
-	如果pager以临时一个临时文件打开（即用户为输入文件名），或者打开了一个小于N字节大小的文件，输出缓冲区被置零并返回SQLITE_OK。
-	该操作的基本原理：这个函数被用来读取数据库头，且一个新的临时或者置零的数据库有这样一个头：其大小大于整个文件大小
-	
-	如果除了SQLITE_IOERR_SHORT_READ 的其他IO错误码被命中，将其返回给调用者，且输出缓冲区的内容为未定义状态
+读取文件的头N个字节到内存那种，是的pDest指针指向文件头数据。
+如果pager以临时一个临时文件打开（即用户为输入文件名），或者打开了一个小于N字节大小的文件，输出缓冲区被置零并返回SQLITE_OK。
+该操作的基本原理：这个函数被用来读取数据库头，且一个新的临时或者置零的数据库有这样一个头：其大小大于整个文件大小
+
+如果除了SQLITE_IOERR_SHORT_READ 的其他IO错误码被命中，将其返回给调用者，且输出缓冲区的内容为未定义状态
 */
 int sqlite3PagerReadFileheader(Pager *pPager, int N, unsigned char *pDest){		N:100	pDest:"SQLite format 3"
   int rc = SQLITE_OK;
@@ -3907,6 +4020,7 @@ Pgno sqlite3PagerPagenumber(DbPage *pPg){
 
 /*
 ** Increment the reference count for page pPg.
+对页面的引用进行递增
 */
 void sqlite3PagerRef(DbPage *pPg){
   sqlite3PcacheRef(pPg);
@@ -4195,6 +4309,7 @@ static int pager_write_pagelist(Pager *pPager, PgHdr *pList){
 ** SQLITE_OK is returned if everything goes according to plan. An 
 ** SQLITE_IOERR_XXX error code is returned if a call to sqlite3OsOpen() 
 ** fails.
+确保子日志文件处于打开状态，如果已经打开，什么都不做。
 */
 static int openSubJournal(Pager *pPager){
   int rc = SQLITE_OK;
@@ -4729,6 +4844,20 @@ int sqlite3PagerOpen(
 ** set to 0 and SQLITE_OK returned. If an IO error occurs while trying
 ** to determine whether or not a hot-journal file exists, the IO error
 ** code is returned and the value of *pExists is undefined.
+pager锁状态从PAGER_UNLOCK转换到PAGER_SHARED状态之后，该函数被调用。测试对于给定的pager，文件系统中是否存在热日志。
+热日志存在与否的判别标准：（and）
+日志文件在文件系统中
+没有进程持有数据库文件上的RESERVED或者更大的锁
+数据库文件本身的大小大于0字节
+日志文件的第一个字节存在且不为0x00
+
+如果数据库文件当前大小为0，但是日志文件存在，可能是上一个同名数据库遗留的日志。此时日志文件通过OsDelete删除，pExists设置为0，返回SQLITE_OK。
+
+该函数不检查文件末尾的master日志文件名。如果有并且master日志文件不存在，那么日志不是真正的热日志。这种情况下该函数返回一个false-positive。pager_playback()
+函数会发现该日志文件不是真正的热日志并且不会进行回滚。
+如果热日志文件存在并被发现，pExists设置为1并返回SQLITE_OK，不存在的话pExists设置为0。
+发生错误，返回错误码，pExists未定义
+
 */
 static int hasHotJournal(Pager *pPager, int *pExists){
   sqlite3_vfs * const pVfs = pPager->pVfs;
