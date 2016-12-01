@@ -7045,6 +7045,7 @@ int sqlite3PagerWalFramesize(Pager *pPager){
 **
 ** This function returns a pointer to a buffer containing the encrypted
 ** page content. If a malloc fails, this function may return NULL.
+返回一个已加密内容
 */
 void *sqlite3PagerCodec(PgHdr *pPg){
   void *aData = 0;
