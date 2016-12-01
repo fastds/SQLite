@@ -441,14 +441,18 @@ int sqlite3PagerTrace=1;  /* True to enable tracing */
 ** immediately following the last journal record written into the main
 ** journal before the journal-header. This is required during savepoint
 ** rollback (see pagerPlaybackSavepoint()).
+	PagerSavepoint：用来分配给每一个活动的系统中的保存点和语句事务。所有这样的结构体被存在数组Pager.aSavepoint[]中，该数据用sqlite3Realloc()
+	来重新分配大小。
+	当一个保存点被创建，PagerSavepoint.iHdrOffset域被设置为0.如果日志头被活动的保存点写入main日志，那么iHdrOffset在journal-header之前马上被设置为最后一个被写入
+	main日志的日志记录的字节偏移量。在保存点回滚期间被需要(see pagerPlaybackSavepoint()).
 */
 typedef struct PagerSavepoint PagerSavepoint;
 struct PagerSavepoint {
-  i64 iOffset;                 /* Starting offset in main journal */				//main日志当中的其实偏移量
+  i64 iOffset;                 /* Starting offset in main journal */				//main日志当中的起始偏移量
   i64 iHdrOffset;              /* See above */
   Bitvec *pInSavepoint;        /* Set of pages in this savepoint */					//在当前保存点中的pages集合
   Pgno nOrig;                  /* Original number of pages in file */				//
-  Pgno iSubRec;                /* Index of first record in sub-journal */			//子日志中第一个记录的索引
+  Pgno iSubRec;                /* Index of first record in sub-journal（语句日志） */			//子日志中第一个记录的索引
 #ifndef SQLITE_OMIT_WAL
   u32 aWalData[WAL_SAVEPOINT_NDATA];        /* WAL savepoint context */
 #endif
