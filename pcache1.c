@@ -95,8 +95,8 @@ struct PCache1 {
 */
 struct PgHdr1 {
   sqlite3_pcache_page page;
-  unsigned int iKey;             /* Key value (page number) */						键的值（页号）
-  PgHdr1 *pNext;                 /* Next in hash table chain */						哈希表chain中的下一个
+  unsigned int iKey;             /* Key value (page number) */						键的值（页号）；桶号 = 键的值（页号）% nHash(桶数)
+  PgHdr1 *pNext;                 /* Next in hash table chain */						哈希表中链表中的下一个
   PCache1 *pCache;               /* Cache that currently owns this page */			拥有当前页面的页缓存
   PgHdr1 *pLruNext;              /* Next in LRU list of unpinned pages */			LRU列表中未钉住页面的下一个
   PgHdr1 *pLruPrev;              /* Previous in LRU list of unpinned pages */		.....................上一个
@@ -122,14 +122,14 @@ static SQLITE_WSD struct PCacheGlobal {
   ** The nFreeSlot and pFree values do require mutex protection.
   */
   int isInit;                    /* True if initialized */							如果被初始化了，为true
-  int szSlot;                    /* Size of each free slot */						每一个空闲槽的大小
-  int nSlot;                     /* The number of pcache slots */					pcache槽的数量
-  int nReserve;                  /* Try to keep nFreeSlot above this */				
-  void *pStart, *pEnd;           /* Bounds of pagecache malloc range */				页缓存分配的边界范围
+  int szSlot;                    /* Size of each free slot */						每一个空闲槽（缓冲区）的大小
+  int nSlot;                     /* The number of pcache slots */					pcache空闲槽（缓冲区）的数量
+  int nReserve;                  /* Try to keep nFreeSlot above this */				需要保留的最小空闲槽数量
+  void *pStart, *pEnd;           /* Bounds of pagecache malloc range */				页缓存原始分配的第一个槽，最后一个后面的槽（无效地址）
   /* Above requires no mutex.  Use mutex below for variable that follow. */			以下变量用于mutex情况
   sqlite3_mutex *mutex;          /* Mutex for accessing the following: */			访问以下内容的mutex
   PgFreeslot *pFree;             /* Free page blocks */								空闲的页面块
-  int nFreeSlot;                 /* Number of unused pcache slots */				未使用的pcache槽
+  int nFreeSlot;                 /* Number of unused pcache slots */				未使用的pcache槽，设置后指向最后一个
   /* The following value requires a mutex to change.  We skip the mutex on			以下的值需要一个mutex去改变，我们跳过了在reading上的mutex，因为(1)大多数平台自动读取32-bit整数（2）即使一个错误的值被读取，
   ** reading because (1) most platforms read a 32-bit integer atomically and		也不会造成多大的伤害，因为这仅仅是一个优化项
   ** (2) even if an incorrect value is read, no great harm is done since this
@@ -168,19 +168,22 @@ void sqlite3PCacheBufferSetup(void *pBuf, int sz, int n){
   if( pcache1.isInit ){
     PgFreeslot *p;
     sz = ROUNDDOWN8(sz);
-    pcache1.szSlot = sz;
-    pcache1.nSlot = pcache1.nFreeSlot = n;
+    pcache1.szSlot = sz;			//槽（缓冲区）的大小
+    pcache1.nSlot = pcache1.nFreeSlot = n;	//n个槽（缓冲区）
     pcache1.nReserve = n>90 ? 10 : (n/10 + 1);
-    pcache1.pStart = pBuf;
+    pcache1.pStart = pBuf;		pStart指向第一个空闲缓冲区地址
     pcache1.pFree = 0;
     pcache1.bUnderPressure = 0;
+	/**
+	pcache1.pFree最终指向最后的指向的缓冲区（n--为1），每个缓冲区指向上一个获取地址。形成一个空闲槽的列表
+	*/
     while( n-- ){
-      p = (PgFreeslot*)pBuf;
-      p->pNext = pcache1.pFree;
+      p = (PgFreeslot*)pBuf;		
+      p->pNext = pcache1.pFree;		
       pcache1.pFree = p;
-      pBuf = (void*)&((char*)pBuf)[sz];
+      pBuf = (void*)&((char*)pBuf)[sz];		//指向下一个缓冲区
     }
-    pcache1.pEnd = pBuf;
+    pcache1.pEnd = pBuf;	pEnd指向最后一个空闲缓冲区地址
   }
 }
 
@@ -192,20 +195,21 @@ void sqlite3PCacheBufferSetup(void *pBuf, int sz, int n){
 **
 ** Multiple threads can run this routine at the same time.  Global variables
 ** in pcache1 need to be protected via mutex.
+** pcache空间分配，需要从pcache中的空闲槽（有的话）取出进行分配。
 */
 static void *pcache1Alloc(int nByte){
   void *p = 0;
   assert( sqlite3_mutex_notheld(pcache1.grp.mutex) );
-  sqlite3StatusSet(SQLITE_STATUS_PAGECACHE_SIZE, nByte);
-  if( nByte<=pcache1.szSlot ){
+  sqlite3StatusSet(SQLITE_STATUS_PAGECACHE_SIZE, nByte);	//设置页面缓存大小的字节数
+  if( nByte<=pcache1.szSlot ){					缓存大小小于等于槽大小
     sqlite3_mutex_enter(pcache1.mutex);
     p = (PgHdr1 *)pcache1.pFree;
     if( p ){
       pcache1.pFree = pcache1.pFree->pNext;
       pcache1.nFreeSlot--;
-      pcache1.bUnderPressure = pcache1.nFreeSlot<pcache1.nReserve;
-      assert( pcache1.nFreeSlot>=0 );
-      sqlite3StatusAdd(SQLITE_STATUS_PAGECACHE_USED, 1);
+      pcache1.bUnderPressure = pcache1.nFreeSlot<pcache1.nReserve;		空闲槽<需要保留的数量，设置处于压力状态
+      assert( pcache1.nFreeSlot>=0 );									
+      sqlite3StatusAdd(SQLITE_STATUS_PAGECACHE_USED, 1);				设置pcache使用状态
     }
     sqlite3_mutex_leave(pcache1.mutex);
   }
@@ -224,11 +228,12 @@ static void *pcache1Alloc(int nByte){
 #endif
     sqlite3MemdebugSetType(p, MEMTYPE_PCACHE);
   }
-  return p;
+  return p;			返回分配空间的首地址
 }
 
 /*
 ** Free an allocated buffer obtained from pcache1Alloc().
+释放已经分配的缓冲区，通过将缓冲区重新添加到空闲槽链表尾部
 */
 static int pcache1Free(void *p){
   int nFreed = 0;
@@ -244,7 +249,7 @@ static int pcache1Free(void *p){
     pcache1.bUnderPressure = pcache1.nFreeSlot<pcache1.nReserve;
     assert( pcache1.nFreeSlot<=pcache1.nSlot );
     sqlite3_mutex_leave(pcache1.mutex);
-  }else{
+  }else{		如果释放的地址范围不在原始范围缓存分配范围内，则是额外分配的，释放
     assert( sqlite3MemdebugHasType(p, MEMTYPE_PCACHE) );
     sqlite3MemdebugSetType(p, MEMTYPE_HEAP);
     nFreed = sqlite3MallocSize(p);
@@ -429,6 +434,7 @@ static int pcache1ResizeHash(PCache1 *p){
 ** The PGroup mutex must be held when this function is called.
 **
 ** If pPage is NULL then this routine is a no-op.
+	将页面pPage钉住.即将该页面从LRU列表中移除
 */
 static void pcache1PinPage(PgHdr1 *pPage){
   PCache1 *pCache;
@@ -463,6 +469,9 @@ static void pcache1PinPage(PgHdr1 *pPage){
 ** (PCache1.apHash structure) that it is currently stored in.
 **
 ** The PGroup mutex must be held when this function is called.
+从哈希表中移除pPage	：
+找到pPage所在桶
+找到桶后，查找链表，找到即可移除（改变指针）
 */
 static void pcache1RemoveFromHash(PgHdr1 *pPage){
   unsigned int h;
