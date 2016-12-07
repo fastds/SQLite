@@ -320,7 +320,7 @@ static PgHdr1 *pcache1AllocPage(PCache1 *pCache){
     p->page.pBuf = pPg;								将页面缓冲区指向刚刚分配的地址
     p->page.pExtra = &p[1];							额外份额配的空间指向自己的首地址
     if( pCache->bPurgeable ){						
-      pCache->pGroup->nCurrentPage++;				可清除的页面数++
+      pCache->pGroup->nCurrentPage++;				当前已分配且可清除的页面数++
     }
     return p;										返回分配好的页面
   }
@@ -338,12 +338,12 @@ static void pcache1FreePage(PgHdr1 *p){
   if( ALWAYS(p) ){
     PCache1 *pCache = p->pCache;
     assert( sqlite3_mutex_held(p->pCache->pGroup->mutex) );
-    pcache1Free(p->page.pBuf);					放到空闲槽
+    pcache1Free(p->page.pBuf);					放到空闲槽或释放空间
 #ifdef SQLITE_PCACHE_SEPARATE_HEADER
     sqlite3_free(p);
 #endif
     if( pCache->bPurgeable ){
-      pCache->pGroup->nCurrentPage--;
+      pCache->pGroup->nCurrentPage--;		可清除页面数量减少（空闲槽中的直接可以用，不用清除）
     }
   }
 }
@@ -537,7 +537,6 @@ static void pcache1TruncateUnsafe(
         pCache->nPage--;
         *pp = pPage->pNext;					
         pcache1PinPage(pPage);				钉住要丢弃的页面
-        pcache1FreePage(pPage);				释放该页面
         pcache1FreePage(pPage);				释放该页面
       }else{
         pp = &pPage->pNext;
@@ -853,7 +852,7 @@ static sqlite3_pcache_page *pcache1Fetch(
     if( createFlag==1 ) sqlite3EndBenignMalloc();
   }
 
-  if( pPage ){
+  if( pPage ){			将分配到的页面插入哈希表中
     unsigned int h = iKey % pCache->nHash;
     pCache->nPage++;
     pPage->iKey = iKey;
@@ -891,7 +890,7 @@ static void pcache1Unpin(
   assert( pPage->pCache==pCache );
   pcache1EnterMutex(pGroup);
 
-  /* It is an error to call this function if the page is already 
+  /* It is an error to call this function if the page is already 		如果page已经是PGroupLRU列表中的一部分，调用该方法是错误的行为（因为LRU中的都是未钉住的）
   ** part of the PGroup LRU list.
   */
   assert( pPage->pLruPrev==0 && pPage->pLruNext==0 );
@@ -903,7 +902,7 @@ static void pcache1Unpin(
   }else{
     /* Add the page to the PGroup LRU list. */
     if( pGroup->pLruHead ){
-      pGroup->pLruHead->pLruPrev = pPage;
+      pGroup->pLruHead->pLruPrev = pPage; 添加在双向链表头部
       pPage->pLruNext = pGroup->pLruHead;
       pGroup->pLruHead = pPage;
     }else{
@@ -918,6 +917,7 @@ static void pcache1Unpin(
 
 /*
 ** Implementation of the sqlite3_pcache.xRekey method. 
+重置页号
 */
 static void pcache1Rekey(
   sqlite3_pcache *p,
@@ -936,7 +936,7 @@ static void pcache1Rekey(
 
   h = iOld%pCache->nHash;
   pp = &pCache->apHash[h];
-  while( (*pp)!=pPage ){
+  while( (*pp)!=pPage ){			找到老的页号对应的页面
     pp = &(*pp)->pNext;
   }
   *pp = pPage->pNext;
@@ -958,6 +958,7 @@ static void pcache1Rekey(
 ** Discard all unpinned pages in the cache with a page number equal to
 ** or greater than parameter iLimit. Any pinned pages with a page number
 ** equal to or greater than iLimit are implicitly unpinned.
+丢弃所有cache中页号大于等于iLimit的未钉住的页面。任何页号大于等于iLimit的钉住的页面隐式的未钉住
 */
 static void pcache1Truncate(sqlite3_pcache *p, unsigned int iLimit){
   PCache1 *pCache = (PCache1 *)p;
@@ -1024,6 +1025,8 @@ void sqlite3PCacheSetDefault(void){
 ** nReq is the number of bytes of memory required. Once this much has
 ** been released, the function returns. The return value is the total number 
 ** of bytes of memory released.
+释放pager系统持有的多余的动态分配的内存
+nReq：内存需要的字节数。一旦被释放，方法返回。返回值是被释放的字节总数
 */
 int sqlite3PcacheReleaseMemory(int nReq){
   int nFree = 0;
