@@ -81,14 +81,14 @@ struct PCache1 {
   /* Hash table of all pages. The following variables may only be accessed			所有页面的哈希表。以下变量可能仅仅在访问者持有PGroup mutex的时候被访问
   ** when the accessor is holding the PGroup mutex.
   */		
-  unsigned int nRecyclable;           /* Number of pages in the LRU list */			LRU列表中的页面数(可回收利用的)
+  unsigned int nRecyclable;           /* Number of pages in the LRU list */			LRU双向链表中的页面数(可回收利用的)
   unsigned int nPage;                 /* Total number of pages in apHash */			apHash中页面的总数
   unsigned int nHash;                 /* Number of slots in apHash[] */				apHash[]的槽的数量
-  PgHdr1 **apHash;                    /* Hash table for fast lookup by key */		用于快速查找key的哈希表
+  PgHdr1 **apHash;                    /* Hash table for fast lookup by key */		用于快速查找key的哈希表（二维数组）存储着多个LRU双向链表
 };
 
 /*
-** Each cache entry is represented by an instance of the following 					以下对象，表示每一个缓存entry。除非SQLITE_PCAHE_SEPARATE_HEADER被定义，在这个结构体在内存之前。
+** Each cache entry is represented by an instance of the following 					以下对象，表示每一个cache entry。除非SQLITE_PCAHE_SEPARATE_HEADER被定义，在这个结构体在内存之前。
 ** structure. Unless SQLITE_PCACHE_SEPARATE_HEADER is defined, a buffer of			一个 PgHdr1.pCache->szPage字节大小的缓冲区被直接分配
 ** PgHdr1.pCache->szPage bytes is allocated directly before this structure 
 ** in memory.
@@ -98,13 +98,14 @@ struct PgHdr1 {
   unsigned int iKey;             /* Key value (page number) */						键的值（页号）；桶号 = 键的值（页号）% nHash(桶数)
   PgHdr1 *pNext;                 /* Next in hash table chain */						哈希表中链表中的下一个
   PCache1 *pCache;               /* Cache that currently owns this page */			拥有当前页面的页缓存
-  PgHdr1 *pLruNext;              /* Next in LRU list of unpinned pages */			LRU列表中未钉住页面的下一个
+  PgHdr1 *pLruNext;              /* Next in LRU list of unpinned pages */			LRU列表中未钉住页面（内存压力大时可以用来替换）的下一个
   PgHdr1 *pLruPrev;              /* Previous in LRU list of unpinned pages */		.....................上一个
 };
 
 /*
 ** Free slots in the allocator used to divide up the buffer provided using			
 ** the SQLITE_CONFIG_PAGECACHE mechanism.
+分配器中的空闲槽用来划分用SQLITE_CONFIG_PAGECACHE机制所提供的缓冲区
 */
 struct PgFreeslot {
   PgFreeslot *pNext;  /* Next free slot */
@@ -126,9 +127,10 @@ static SQLITE_WSD struct PCacheGlobal {
   int nSlot;                     /* The number of pcache slots */					pcache空闲槽（缓冲区）的数量
   int nReserve;                  /* Try to keep nFreeSlot above this */				需要保留的最小空闲槽数量
   void *pStart, *pEnd;           /* Bounds of pagecache malloc range */				页缓存原始分配的第一个槽，最后一个后面的槽（无效地址）
+  
   /* Above requires no mutex.  Use mutex below for variable that follow. */			以下变量用于mutex情况
   sqlite3_mutex *mutex;          /* Mutex for accessing the following: */			访问以下内容的mutex
-  PgFreeslot *pFree;             /* Free page blocks */								空闲的页面块
+  PgFreeslot *pFree;             /* Free page blocks */								空闲的页面块（指向链表最后一个有效缓冲区地址）
   int nFreeSlot;                 /* Number of unused pcache slots */				未使用的pcache槽，设置后指向最后一个
   /* The following value requires a mutex to change.  We skip the mutex on			以下的值需要一个mutex去改变，我们跳过了在reading上的mutex，因为(1)大多数平台自动读取32-bit整数（2）即使一个错误的值被读取，
   ** reading because (1) most platforms read a 32-bit integer atomically and		也不会造成多大的伤害，因为这仅仅是一个优化项
@@ -143,7 +145,7 @@ static SQLITE_WSD struct PCacheGlobal {
 ** compiling for systems that do not support real WSD.
 	该文件的所有代码应该访问上面的全局结构体（通过pcache1）。这保证当编译的目标系统不支持真正的WSD时，保证了WSD竞争被使用
 */
-#define pcache1 (GLOBAL(struct PCacheGlobal, pcache1_g))
+#define pcache1 (GLOBAL(struct PCacheGlobal, pcache1_g))				pcache1：表示PCacheGlobal对象
 
 /*
 ** Macros to enter and leave the PCache LRU mutex.
@@ -162,10 +164,14 @@ static SQLITE_WSD struct PCacheGlobal {
 **
 ** This routine is called from sqlite3_initialize() and so it is guaranteed
 ** to be serialized already.  There is no need for further mutexing.
-	
+	 对PCache的缓冲区（已经分配完成）进行设置（对全局变量PCacheGlobal），初始化
+	 参数描述：
+	 pBuf：指向一块大的缓冲区，大小为n*sz
+	 sz：每一个小缓冲区的字节大小
+	 n：小缓冲区的数量
 */
 void sqlite3PCacheBufferSetup(void *pBuf, int sz, int n){
-  if( pcache1.isInit ){
+  if( pcache1.isInit ){				//PCacheGlobal对象
     PgFreeslot *p;
     sz = ROUNDDOWN8(sz);
     pcache1.szSlot = sz;			//槽（缓冲区）的大小
@@ -175,7 +181,7 @@ void sqlite3PCacheBufferSetup(void *pBuf, int sz, int n){
     pcache1.pFree = 0;
     pcache1.bUnderPressure = 0;
 	/**
-	pcache1.pFree最终指向最后的指向的缓冲区（n--为1），每个缓冲区指向上一个获取地址。形成一个空闲槽的列表
+	pcache1.pFree最终指向最后的指向的缓冲区（n--为1），每个缓冲区指向上一个获取地址。形成一个空闲槽的单向链表
 	*/
     while( n-- ){
       p = (PgFreeslot*)pBuf;		
@@ -195,7 +201,8 @@ void sqlite3PCacheBufferSetup(void *pBuf, int sz, int n){
 **
 ** Multiple threads can run this routine at the same time.  Global variables
 ** in pcache1 need to be protected via mutex.
-** pcache空间分配，需要从pcache中的空闲槽（有的话）取出进行分配。
+** pcache空间分配，需要从pcache中的空闲槽单向链表中（有的话）取出。
+如果空闲槽中已经没有可以分配的槽了，则调用sqliteMalloc分配空间
 */
 static void *pcache1Alloc(int nByte){
   void *p = 0;
@@ -213,7 +220,7 @@ static void *pcache1Alloc(int nByte){
     }
     sqlite3_mutex_leave(pcache1.mutex);
   }
-  if( p==0 ){
+  if( p==0 ){		SQLITE_CONFIG_PAGECACHE池中没有内存可用。重新用sqlite3Malloc分配
     /* Memory is not available in the SQLITE_CONFIG_PAGECACHE pool.  Get
     ** it from sqlite3Malloc instead.
     */
@@ -222,7 +229,7 @@ static void *pcache1Alloc(int nByte){
     if( p ){
       int sz = sqlite3MallocSize(p);
       sqlite3_mutex_enter(pcache1.mutex);
-      sqlite3StatusAdd(SQLITE_STATUS_PAGECACHE_OVERFLOW, sz);
+      sqlite3StatusAdd(SQLITE_STATUS_PAGECACHE_OVERFLOW, sz);			//添加溢出状态（缓存池中没有空闲可用的缓存）
       sqlite3_mutex_leave(pcache1.mutex);
     }
 #endif
@@ -233,7 +240,7 @@ static void *pcache1Alloc(int nByte){
 
 /*
 ** Free an allocated buffer obtained from pcache1Alloc().
-释放已经分配的缓冲区，通过将缓冲区重新添加到空闲槽链表尾部
+释放已经分配的缓冲区，通过将缓冲区重新添加到空闲槽单项链表尾部
 */
 static int pcache1Free(void *p){
   int nFreed = 0;
@@ -249,7 +256,7 @@ static int pcache1Free(void *p){
     pcache1.bUnderPressure = pcache1.nFreeSlot<pcache1.nReserve;
     assert( pcache1.nFreeSlot<=pcache1.nSlot );
     sqlite3_mutex_leave(pcache1.mutex);
-  }else{		如果释放的地址范围不在原始范围缓存分配范围内，则是额外分配的，释放
+  }else{		如果释放的地址范围不在原始范围缓存分配范围内，则是额外分配的，直接释放之前给它额外分配的空间
     assert( sqlite3MemdebugHasType(p, MEMTYPE_PCACHE) );
     sqlite3MemdebugSetType(p, MEMTYPE_HEAP);
     nFreed = sqlite3MallocSize(p);
@@ -283,6 +290,7 @@ static int pcache1MemSize(void *p){
 
 /*
 ** Allocate a new page object initially associated with cache pCache.
+为相关的pCache分配一个初始的页面对象
 */
 static PgHdr1 *pcache1AllocPage(PCache1 *pCache){
   PgHdr1 *p = 0;
@@ -293,28 +301,28 @@ static PgHdr1 *pcache1AllocPage(PCache1 *pCache){
   ** this mutex is not held. */
   assert( sqlite3_mutex_held(pCache->pGroup->mutex) );
   pcache1LeaveMutex(pCache->pGroup);
-#ifdef SQLITE_PCACHE_SEPARATE_HEADER
-  pPg = pcache1Alloc(pCache->szPage);
-  p = sqlite3Malloc(sizeof(PgHdr1) + pCache->szExtra);
+#ifdef SQLITE_PCACHE_SEPARATE_HEADER  如果定义SQLITE_PCACHE_SEPARATE_HEADER（即页面数据需要的缓冲区与页面对象需要的缓冲区不分配在一个连续区域中，即分开分配；否则一次性分配一共所需的空间）
+  pPg = pcache1Alloc(pCache->szPage);							分配页面对象需要的缓冲区
+  p = sqlite3Malloc(sizeof(PgHdr1) + pCache->szExtra);			分配页面对象
   if( !pPg || !p ){
-    pcache1Free(pPg);
+    pcache1Free(pPg);					
     sqlite3_free(p);
     pPg = 0;
   }
 #else
-  pPg = pcache1Alloc(sizeof(
-1) + pCache->szPage + pCache->szExtra);
-  p = (PgHdr1 *)&((u8 *)pPg)[pCache->szPage];
+  pPg = pcache1Alloc(sizeof(						将分配了空间的对象添加到自己的空闲槽当中
+1) + pCache->szPage + pCache->szExtra);				 pCache->szExtra大小【是否：p->page.pBuf+p->page.pExtra需要的空间】
+  p = (PgHdr1 *)&((u8 *)pPg)[pCache->szPage];		p指向额外分配的空间(extra)区域的首地址（所以额外空间是用来存pgHdr1的？）
 #endif
   pcache1EnterMutex(pCache->pGroup);
 
   if( pPg ){
-    p->page.pBuf = pPg;
-    p->page.pExtra = &p[1];
-    if( pCache->bPurgeable ){
-      pCache->pGroup->nCurrentPage++;
+    p->page.pBuf = pPg;								将页面缓冲区指向刚刚分配的地址
+    p->page.pExtra = &p[1];							额外份额配的空间指向自己的首地址
+    if( pCache->bPurgeable ){						
+      pCache->pGroup->nCurrentPage++;				可清除的页面数++
     }
-    return p;
+    return p;										返回分配好的页面
   }
   return 0;
 }
@@ -330,7 +338,7 @@ static void pcache1FreePage(PgHdr1 *p){
   if( ALWAYS(p) ){
     PCache1 *pCache = p->pCache;
     assert( sqlite3_mutex_held(p->pCache->pGroup->mutex) );
-    pcache1Free(p->page.pBuf);
+    pcache1Free(p->page.pBuf);					放到空闲槽
 #ifdef SQLITE_PCACHE_SEPARATE_HEADER
     sqlite3_free(p);
 #endif
@@ -346,13 +354,13 @@ static void pcache1FreePage(PgHdr1 *p){
 ** exists, this function falls back to sqlite3Malloc().
 */
 void *sqlite3PageMalloc(int sz){
-  return pcache1Alloc(sz);
+  return pcache1Alloc(sz);			分配空间，放到空闲槽
 }
 
 /*
 ** Free an allocated buffer obtained from sqlite3PageMalloc().
 */
-void sqlite3PageFree(void *p){
+void sqlite3PageFree(void *p){		释放一个page，将该page放到空闲槽
   pcache1Free(p);
 }
 
@@ -434,7 +442,7 @@ static int pcache1ResizeHash(PCache1 *p){
 ** The PGroup mutex must be held when this function is called.
 **
 ** If pPage is NULL then this routine is a no-op.
-	将页面pPage钉住.即将该页面从LRU列表中移除
+	将页面pPage钉住.即将该页面从LRU列表中移除（如果指定的页面在其中的话）
 */
 static void pcache1PinPage(PgHdr1 *pPage){
   PCache1 *pCache;
@@ -459,7 +467,7 @@ static void pcache1PinPage(PgHdr1 *pPage){
     }
     pPage->pLruNext = 0;
     pPage->pLruPrev = 0;
-    pPage->pCache->nRecyclable--;
+    pPage->pCache->nRecyclable--;			//可回收利用的页面--
   }
 }
 
@@ -483,12 +491,16 @@ static void pcache1RemoveFromHash(PgHdr1 *pPage){
   for(pp=&pCache->apHash[h]; (*pp)!=pPage; pp=&(*pp)->pNext);
   *pp = (*pp)->pNext;
 
-  pCache->nPage--;
+  pCache->nPage--;								pcache中的页面--
 }
 
 /*
 ** If there are currently more than nMaxPage pages allocated, try
 ** to recycle pages to reduce the number allocated to nMaxPage.
+
+	如果现在有超过nMaxPage页被分配，试图循环利用页面来减少分配给nMaxPage的数
+	操作过程：
+	从pGroup的链表的pLruTail开始查找，将该双向链表中的page，将其从hash表中移除，从空空闲槽中移除
 */
 static void pcache1EnforceMaxPage(PGroup *pGroup){
   assert( sqlite3_mutex_held(pGroup->mutex) );
@@ -507,6 +519,8 @@ static void pcache1EnforceMaxPage(PGroup *pGroup){
 ** criteria are unpinned before they are discarded.
 **
 ** The PCache mutex must be held when this function is called.
+	从缓存pCache中丢弃（从哈希表中移除）所有大于等于给定的页号的页面。这些页面在丢弃之前进行unpinned操作
+	
 */
 static void pcache1TruncateUnsafe(
   PCache1 *pCache,             /* The cache to truncate */
@@ -516,14 +530,15 @@ static void pcache1TruncateUnsafe(
   unsigned int h;
   assert( sqlite3_mutex_held(pCache->pGroup->mutex) );
   for(h=0; h<pCache->nHash; h++){
-    PgHdr1 **pp = &pCache->apHash[h]; 
+    PgHdr1 **pp = &pCache->apHash[h]; 		遍历桶
     PgHdr1 *pPage;
     while( (pPage = *pp)!=0 ){
-      if( pPage->iKey>=iLimit ){
+      if( pPage->iKey>=iLimit ){			满足页号大于等于iLimit的都丢弃
         pCache->nPage--;
-        *pp = pPage->pNext;
-        pcache1PinPage(pPage);
-        pcache1FreePage(pPage);
+        *pp = pPage->pNext;					
+        pcache1PinPage(pPage);				钉住要丢弃的页面
+        pcache1FreePage(pPage);				释放该页面
+        pcache1FreePage(pPage);				释放该页面
       }else{
         pp = &pPage->pNext;
         TESTONLY( nPage++; )
@@ -534,10 +549,10 @@ static void pcache1TruncateUnsafe(
 }
 
 /******************************************************************************/
-/******** sqlite3_pcache Methods **********************************************/
+/******** sqlite3_pcache Methods ****************sqlite3_pcache方法列表******************************/
 
 /*
-** Implementation of the sqlite3_pcache.xInit method.
+** Implementation of the sqlite3_pcache.xInit method.		sqlite3_pcache.xInit方法的实现。分配pcache1空间，互斥系统
 */
 static int pcache1Init(void *NotUsed){
   UNUSED_PARAMETER(NotUsed);
@@ -547,15 +562,16 @@ static int pcache1Init(void *NotUsed){
     pcache1.grp.mutex = sqlite3_mutex_alloc(SQLITE_MUTEX_STATIC_LRU);
     pcache1.mutex = sqlite3_mutex_alloc(SQLITE_MUTEX_STATIC_PMEM);
   }
-  pcache1.grp.mxPinned = 10;
-  pcache1.isInit = 1;
+  pcache1.grp.mxPinned = 10;			最大钉住的页面
+  pcache1.isInit = 1;					设置初始化标记
   return SQLITE_OK;
 }
 
 /*
-** Implementation of the sqlite3_pcache.xShutdown method.
+** Implementation of the sqlite3_pcache.xShutdown method.		sqlite3_pcache.xShutdown方法的实现
 ** Note that the static mutex allocated in xInit does 
 ** not need to be freed.
+
 */
 static void pcache1Shutdown(void *NotUsed){
   UNUSED_PARAMETER(NotUsed);
@@ -564,14 +580,14 @@ static void pcache1Shutdown(void *NotUsed){
 }
 
 /*
-** Implementation of the sqlite3_pcache.xCreate method.
+** Implementation of the sqlite3_pcache.xCreate method.			sqlite3_pcache.xCreate的实现
 **
-** Allocate a new cache.
+** Allocate a new cache.	用来分配新的pCache
 */
 static sqlite3_pcache *pcache1Create(int szPage, int szExtra, int bPurgeable){
-  PCache1 *pCache;      /* The newly created page cache */
-  PGroup *pGroup;       /* The group the new page cache will belong to */
-  int sz;               /* Bytes of memory required to allocate the new cache */
+  PCache1 *pCache;      /* The newly created page cache */		重新创建的页缓存
+  PGroup *pGroup;       /* The group the new page cache will belong to */	新的页缓存所属的PGroup
+  int sz;               /* Bytes of memory required to allocate the new cache */	分配给新缓存的内存字节数
 
   /*
   ** The seperateCache variable is true if each PCache has its own private
@@ -584,6 +600,9 @@ static sqlite3_pcache *pcache1Create(int szPage, int szExtra, int bPurgeable){
   **
   **   *  Otherwise (if multi-threaded and ENABLE_MEMORY_MANAGEMENT is off)
   **      use separate caches (mode-1)
+	seperateCache：true：表示没有给PCache有自己独立私有的PGroup，此时不需要互斥
+		*总是使用未定义的cache，如果ENABLE_MEMORY_MANAGEMENT
+		*
   */
 #if defined(SQLITE_ENABLE_MEMORY_MANAGEMENT) || SQLITE_THREADSAFE==0
   const int separateCache = 0;
@@ -593,6 +612,7 @@ static sqlite3_pcache *pcache1Create(int szPage, int szExtra, int bPurgeable){
 
   assert( (szPage & (szPage-1))==0 && szPage>=512 && szPage<=65536 );
   assert( szExtra < 300 );
+  
 
   sz = sizeof(PCache1) + sizeof(PGroup)*separateCache;
   pCache = (PCache1 *)sqlite3MallocZero(sz);
@@ -622,6 +642,7 @@ static sqlite3_pcache *pcache1Create(int szPage, int szExtra, int bPurgeable){
 ** Implementation of the sqlite3_pcache.xCachesize method. 
 **
 ** Configure the cache_size limit for a cache.
+配置缓冲区的cache_size限制，该限制表示pcache中页面的最大数量
 */
 static void pcache1Cachesize(sqlite3_pcache *p, int nMax){
   PCache1 *pCache = (PCache1 *)p;
@@ -651,6 +672,7 @@ static void pcache1Shrink(sqlite3_pcache *p){
     savedMaxPage = pGroup->nMaxPage;
     pGroup->nMaxPage = 0;
     pcache1EnforceMaxPage(pGroup);
+	
     pGroup->nMaxPage = savedMaxPage;
     pcache1LeaveMutex(pGroup);
   }
@@ -721,6 +743,23 @@ static int pcache1Pagecount(sqlite3_pcache *p){
 **      proceed to step 5. 
 **
 **   5. Otherwise, allocate and return a new page buffer.
+sqlite3_pcache.xFetch方法的实现：通过一个key来fetch一个page
+是否可以通过此函数分配新页面取决于createFlag参数的值。 0：表示不分配新页面。 1：表示如果空间容易获得，则分配新页面。 2：意味着要努力分配一个新的页面。
+
+对于 non-purgeable的缓存（用作内存数据库的缓存），createFlag 1和2没有区别.所以调用函数（pcache.c）永远不会有一个createFlag为1的non-purgeable的缓存。
+有三种不同的方法来获取页面空间，取决于参数createFlag的值（其可以是0，1或2）。
+1、不管createFlag的值如何，都会在Cache中搜索所请求页面的副本。 如果找到，则返回。
+2、如果createFlag==0，并且页面已经不在缓存中，返回NULL
+3、如果createFlag==1，并且page已经不在cache中，并且以下任一条件满足，返回NULL(不分配一个新页面)
+（a）由cache钉住的页面数大于PCache1.nMax或者
+（b）由cache钉住的页面数大于所有purgeable缓存的nMax的总和，小鱼所有其他purgeable缓存的nMin或者
+4、如果以上三个条件没有一个满足，并且cache被标记为purgeable，并且如果以下条件之一为真：
+（a）分配给cache的页面数为PCache1.nMax
+（b）分配给所有purgeable缓存的页面数大于等于这些缓存的nMax之和
+（c）系统处于主存压力之下，并且想要避免不必要的页面缓存entry分配
+
+试图从LRU列表中循环利用一个页面。如果大小合适，返回可利用的缓冲区。否则，释放缓冲区并且进行步骤5
+5、否则，分配并返回一个新页面缓存
 */
 static sqlite3_pcache_page *pcache1Fetch(
   sqlite3_pcache *p, 
@@ -738,14 +777,14 @@ static sqlite3_pcache_page *pcache1Fetch(
   assert( pCache->nMin==0 || pCache->bPurgeable );
   pcache1EnterMutex(pGroup = pCache->pGroup);
 
-  /* Step 1: Search the hash table for an existing entry. */
+  /* Step 1: Search the hash table for an existing entry. */					第一步：检索哈希表中一个已存在的entry
   if( pCache->nHash>0 ){
     unsigned int h = iKey % pCache->nHash;
     for(pPage=pCache->apHash[h]; pPage&&pPage->iKey!=iKey; pPage=pPage->pNext);
   }
 
-  /* Step 2: Abort if no existing page is found and createFlag is 0 */
-  if( pPage || createFlag==0 ){
+  /* Step 2: Abort if no existing page is found and createFlag is 0 */			第二步：如果没有找到存在的页面并且createFlag为0则中断。
+  if( pPage || createFlag==0 ){	
     pcache1PinPage(pPage);
     goto fetch_out;
   }
@@ -761,7 +800,7 @@ static sqlite3_pcache_page *pcache1Fetch(
   pGroup = pCache->pGroup;
 #endif
 
-  /* Step 3: Abort if createFlag is 1 but the cache is nearly full */
+  /* Step 3: Abort if createFlag is 1 but the cache is nearly full */			第三步：如果createFlag=1，但是cache近乎满的状态，中断
   assert( pCache->nPage >= pCache->nRecyclable );
   nPinned = pCache->nPage - pCache->nRecyclable;
   assert( pGroup->mxPinned == pGroup->nMaxPage + 10 - pGroup->nMinPage );
@@ -778,8 +817,8 @@ static sqlite3_pcache_page *pcache1Fetch(
     goto fetch_out;
   }
 
-  /* Step 4. Try to recycle a page. */
-  if( pCache->bPurgeable && pGroup->pLruTail && (
+  /* Step 4. Try to recycle a page. */											第四步：试图从LRU链表中重用页面
+  if( pCache->bPurgeable && pGroup->pLruTail && (		判断：如果1、可清理、LRU链表可用、pCache中的页面大于配置的最大值 || 可清理页面大于等于最大页面 || 内存压力大
          (pCache->nPage+1>=pCache->nMax)
       || pGroup->nCurrentPage>=pGroup->nMaxPage
       || pcache1UnderMemoryPressure(pCache)
