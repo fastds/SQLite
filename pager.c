@@ -612,15 +612,7 @@ struct PagerSavepoint {
 **   is always set to SQLITE_FULL, SQLITE_IOERR or one of the SQLITE_IOERR_XXX 		//SQLITE_FULL, SQLITE_IOERR或者SQLITE_IOERR_XXX代码的其中之一
 **   sub-codes.
 */
-
-
-
-
-
-
-
-
- {
+struct Pager {
   sqlite3_vfs *pVfs;          /* OS functions to use for IO */						//用于IO操作的OS功能
   u8 exclusiveMode;           /* Boolean. True if locking_mode==EXCLUSIVE */		//布尔值。locking_mode==EXCLUSIVE 为true
   u8 journalMode;             /* One of the PAGER_JOURNALMODE_* values */
@@ -667,13 +659,13 @@ struct PagerSavepoint {
   sqlite3_backup *pBackup;    /* Pointer to list of ongoing backup processes */		//运行的备份进行的指针列表
   PagerSavepoint *aSavepoint; /* Array of active savepoints */						//活动的保存点数组	
   int nSavepoint;             /* Number of elements in aSavepoint[] */				//aSavepoint[]大小
-  char dbFileVers[16];        /* Changes whenever database file changes */
+  char dbFileVers[16];        /* Changes whenever database file changes */			数据库文件改变时发生改变
   /*
   ** End of the routinely-changing class members
   ***************************************************************************/
 
   u16 nExtra;                 /* Add this many bytes to each in-memory page */		//每个内存页面增加的额外字节
-  i16 nReserve;               /* Number of unused bytes at end of each page */		//每个页面未使用的字节数
+  i16 nReserve;               /* Number of unused bytes at end of each page */		//每个页面未使用的字节数（一般为0）
   u32 vfsFlags;               /* Flags for sqlite3_vfs.xOpen() */					//sqlite3_vfs.xOpen()标记
   u32 sectorSize;             /* Assumed sector size during rollback */				//回滚期间假定的扇区大小
   int pageSize;               /* Number of bytes in a page */						//一个页面的字节数
@@ -5325,14 +5317,15 @@ int sqlite3PagerAcquire(
   ** Otherwise, request the page from the PCache layer. */
   if( pPager->errCode!=SQLITE_OK ){
     rc = pPager->errCode;
-  }else{
+  }else{			如果pager状态正常，调用sqlite3PcacheFetch来获取页面
     rc = sqlite3PcacheFetch(pPager->pPCache, pgno, 1, ppPage);
   }
 
   if( rc!=SQLITE_OK ){
-    /* Either the call to sqlite3PcacheFetch() returned an error or the
+    /* Either the call to sqlite3PcacheFetch() returned an error or the			
     ** pager was already in the error-state when this function was called.
-    ** Set pPg to 0 and jump to the exception handler.  */
+    ** Set pPg to 0 and jump to the exception handler. 
+	*/
     pPg = 0;
     goto pager_acquire_err;
   }
@@ -5341,15 +5334,15 @@ int sqlite3PagerAcquire(
 
   if( (*ppPage)->pPager && !noContent ){
     /* In this case the pcache already contains an initialized copy of
-    ** the page. Return without further ado.  */
+    ** the page. Return without further ado.  */			pcache包含了该page的副本，则返回
     assert( pgno<=PAGER_MAX_PGNO && pgno!=PAGER_MJ_PGNO(pPager) );
-    pPager->aStat[PAGER_STAT_HIT]++;
+    pPager->aStat[PAGER_STAT_HIT]++;				//缓存命中状态++
     return SQLITE_OK;
 
   }else{
-    /* The pager cache has created a new page. Its content needs to 
-    ** be initialized.  */
-
+    /* The pager cache has created a new page. Its content needs to 	
+    ** be initialized.  */		该分支：表明pager cache创建了一个新的page。其内容需要被初始化
+	
     pPg = *ppPage;
     pPg->pPager = pPager;
 
@@ -5361,11 +5354,11 @@ int sqlite3PagerAcquire(
     }
 
     if( MEMDB || pPager->dbSize<pgno || noContent || !isOpen(pPager->fd) ){
-      if( pgno>pPager->mxPgno ){
+      if( pgno>pPager->mxPgno ){	如果当前页号大于最大的页号
         rc = SQLITE_FULL;
         goto pager_acquire_err;
       }
-      if( noContent ){
+      if( noContent ){		如果不写数据库的话
         /* Failure to set the bits in the InJournal bit-vectors is benign.
         ** It merely means that we might do some extra work to journal a 
         ** page that does not need to be journaled.  Nevertheless, be sure 
@@ -5383,10 +5376,10 @@ int sqlite3PagerAcquire(
       }
       memset(pPg->pData, 0, pPager->pageSize);
       IOTRACE(("ZERO %p %d\n", pPager, pgno));
-    }else{
+    }else{		else分支：需要从磁盘获取数据
       assert( pPg->pPager==pPager );
-      pPager->aStat[PAGER_STAT_MISS]++;
-      rc = readDbPage(pPg);
+      pPager->aStat[PAGER_STAT_MISS]++;		未命中缓存
+      rc = readDbPage(pPg);					从数据库加载页面
       if( rc!=SQLITE_OK ){
         goto pager_acquire_err;
       }

@@ -1,7 +1,7 @@
 /*
 ** 2008 August 05
 **
-** The author disclaims copyright to this source code.  In place of
+** The author disclaims copyright to this source code.  In place ofof
 ** a legal notice, here is a blessing:
 **
 **    May you do good and not evil.
@@ -97,7 +97,8 @@ static void pcacheRemoveFromDirtyList(PgHdr *pPage){
 }
 
 /*
-** Add page pPage to the head of the dirty list (PCache1.pDirty is set to		增加页面pPage到脏链表的头部（PCache1.pDirty设置为pPage）
+** Add page pPage to the head of the dirty list (PCache1.pDirty is set to		
+增加页面pPage到脏链表的头部（PCache1.pDirty设置为pPage）
 ** pPage).
 */
 static void pcacheAddToDirtyList(PgHdr *pPage){
@@ -121,12 +122,13 @@ static void pcacheAddToDirtyList(PgHdr *pPage){
 }
 
 /*
-** Wrapper around the pluggable caches xUnpin method. If the cache is		可插的caches xUnpin 方法的包装器。如果cache被用于内存数据库，该函数不做任何操作
+** Wrapper around the pluggable caches xUnpin method. If the cache is		
 ** being used for an in-memory database, this function is a no-op.
+可插的caches xUnpin 方法的包装器。如果cache被用于内存数据库，该函数不做任何操作
 */
 static void pcacheUnpin(PgHdr *p){
   PCache *pCache = p->pCache;												
-  if( pCache->bPurgeable ){													如果pCache是可清除的
+  if( pCache->bPurgeable ){													如果pCache是可清除的（非内存数据库）
     if( p->pgno==1 ){														如果页面号是1
       pCache->pPage1 = 0;													将pPage1置空
     }
@@ -136,8 +138,9 @@ static void pcacheUnpin(PgHdr *p){
 
 /*************************************************** General Interfaces ******				通用接口
 **
-** Initialize and shutdown the page cache subsystem. Neither of these 			初始化和关闭cache两个函数都是线程安全的
+** Initialize and shutdown the page cache subsystem. Neither of these 			
 ** functions are threadsafe.
+初始化和关闭cache两个函数都是线程安全的
 */
 int sqlite3PcacheInitialize(void){
   if( sqlite3GlobalConfig.pcache2.xInit==0 ){
@@ -198,7 +201,8 @@ void sqlite3PcacheSetPageSize(PCache *pCache, int szPage){
 }
 
 /*
-** Compute the number of pages of cache requested.				计算需要的缓存页
+** Compute the number of pages of cache requested.
+计算缓存请求的页数（分配的缓存空间能容下的页数）
 */
 static int numberOfCachePages(PCache *p){
   if( p->szCache>=0 ){
@@ -225,8 +229,9 @@ int sqlite3PcacheFetch(
   assert( createFlag==1 || createFlag==0 );
   assert( pgno>0 );
 
-  /* If the pluggable cache (sqlite3_pcache*) has not been allocated,		如果可插入的缓存(sqlite3_pcahce*)没有被分配，则分配
+  /* If the pluggable cache (sqlite3_pcache*) has not been allocated,		
   ** allocate it now.
+  如果可插入的缓存(sqlite3_pcahce*)没有被分配，则分配
   */
   if( !pCache->pCache && createFlag ){
     sqlite3_pcache *p;
@@ -252,10 +257,11 @@ int sqlite3PcacheFetch(
     ** page that does not require a journal-sync (one with PGHDR_NEED_SYNC
     ** cleared), but if that is not possible settle for any other 
     ** unreferenced dirty page.
+	找到一个脏页面，将其写入磁盘以对内存回收利用。如果这不可能处理任何其他未引用的脏页，先尝试找到一个不需要日志同步的页面
     */
     expensive_assert( pcacheCheckSynced(pCache) );
-    for(pPg=pCache->pSynced; 
-        pPg && (pPg->nRef || (pPg->flags&PGHDR_NEED_SYNC)); 
+    for(pPg=pCache->pSynced; //获取同步页面链表
+        pPg && (pPg->nRef || (pPg->flags&PGHDR_NEED_SYNC));		//存在已经同步的页面 并且  
         pPg=pPg->pDirtyPrev
     );
     pCache->pSynced = pPg;
@@ -565,7 +571,7 @@ int sqlite3PcachePageRefcount(PgHdr *p){
 }
 
 /* 
-** Return the total number of pages in the cache.
+** Return the total number of pages in the cache.		返回缓存中页面的总数
 */
 int sqlite3PcachePagecount(PCache *pCache){
   int nPage = 0;

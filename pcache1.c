@@ -320,7 +320,7 @@ static PgHdr1 *pcache1AllocPage(PCache1 *pCache){
     p->page.pBuf = pPg;								将页面缓冲区指向刚刚分配的地址
     p->page.pExtra = &p[1];							额外份额配的空间指向自己的首地址
     if( pCache->bPurgeable ){						
-      pCache->pGroup->nCurrentPage++;				可清除的页面数++
+      pCache->pGroup->nCurrentPage++;				缓存的页面数++
     }
     return p;										返回分配好的页面
   }
@@ -552,7 +552,8 @@ static void pcache1TruncateUnsafe(
 /******** sqlite3_pcache Methods ****************sqlite3_pcache方法列表******************************/
 
 /*
-** Implementation of the sqlite3_pcache.xInit method.		sqlite3_pcache.xInit方法的实现。分配pcache1空间，互斥系统
+** Implementation of the sqlite3_pcache.xInit method.		
+sqlite3_pcache.xInit方法的实现。分配pcache1空间，互斥系统
 */
 static int pcache1Init(void *NotUsed){
   UNUSED_PARAMETER(NotUsed);
@@ -649,7 +650,7 @@ static void pcache1Cachesize(sqlite3_pcache *p, int nMax){
   if( pCache->bPurgeable ){
     PGroup *pGroup = pCache->pGroup;
     pcache1EnterMutex(pGroup);
-    pGroup->nMaxPage += (nMax - pCache->nMax);
+    pGroup->nMaxPage += (nMax - pCache->nMax);		//pCache中的nMax就是分配的缓冲区空间（以页为单位）的数量	
     pGroup->mxPinned = pGroup->nMaxPage + 10 - pGroup->nMinPage;
     pCache->nMax = nMax;
     pCache->n90pct = pCache->nMax*9/10;
@@ -845,7 +846,7 @@ static sqlite3_pcache_page *pcache1Fetch(
   }
 
   /* Step 5. If a usable page buffer has still not been found, 
-  ** attempt to allocate a new one. 
+  ** attempt to allocate a new one. 								仍然找不到可用的页面，试图分配一个页面
   */
   if( !pPage ){
     if( createFlag==1 ) sqlite3BeginBenignMalloc();
@@ -853,7 +854,7 @@ static sqlite3_pcache_page *pcache1Fetch(
     if( createFlag==1 ) sqlite3EndBenignMalloc();
   }
 
-  if( pPage ){
+  if( pPage ){											设置相关属性，将新分配的page放入哈希表中
     unsigned int h = iKey % pCache->nHash;
     pCache->nPage++;
     pPage->iKey = iKey;
@@ -875,9 +876,11 @@ fetch_out:
 
 
 /*
-** Implementation of the sqlite3_pcache.xUnpin method.			sqlite3_pcache.xUnpin方法的实现。将一个页面标记为“未钉住的”	（对于异步回收操作是可用的）		
+** Implementation of the sqlite3_pcache.xUnpin method.			
 **
-** Mark a page as unpinned (eligible for asynchronous recycling).		
+** Mark a page as unpinned (eligible for asynchronous recycling).
+
+sqlite3_pcache.xUnpin方法的实现。将一个页面标记为“未钉住的”	（对于异步回收操作是可用的）				
 */
 static void pcache1Unpin(
   sqlite3_pcache *p, 
@@ -893,6 +896,7 @@ static void pcache1Unpin(
 
   /* It is an error to call this function if the page is already 
   ** part of the PGroup LRU list.
+  如果page已经是LRU列表一部分，返回错误
   */
   assert( pPage->pLruPrev==0 && pPage->pLruNext==0 );
   assert( pGroup->pLruHead!=pPage && pGroup->pLruTail!=pPage );
@@ -901,7 +905,7 @@ static void pcache1Unpin(
     pcache1RemoveFromHash(pPage);
     pcache1FreePage(pPage);
   }else{
-    /* Add the page to the PGroup LRU list. */
+    /* Add the page to the PGroup LRU list. */	将页面添加到LRU列表中
     if( pGroup->pLruHead ){
       pGroup->pLruHead->pLruPrev = pPage;
       pPage->pLruNext = pGroup->pLruHead;
