@@ -2601,9 +2601,8 @@ delmaster_out:
 ** If successful, return SQLITE_OK. If an IO error occurs while modifying
 ** the database file, return the error code to the caller.
 该函数用来改变文件系统中数据库文件的实际大小。这仅仅发生在一个事务的提交或者回滚操作期间（包括一个热日志的回滚）
-如果主数据库文件未打开，pager状态部位OPEN或者DBMOD，该函数什么都不做。否则，文件大小被改变为nPage页(nPage*pPager->pageSize bytes)。如果磁盘上的文件当前大于
-nPage页，使用VFS xTruncate()方法截断。
-或者，磁盘上的文件小于nPage页。如果试图截断文件为某个大于它当前大小，一些操作系统会混乱，所以这种情况要需要进行检测并将一个单独的0字节写到新文件的末尾。
+如果主数据库文件未打开，pager状态部位OPEN或者DBMOD，该函数什么都不做。否则，文件大小被改变为nPage页(nPage*pPager->pageSize bytes)。如果磁盘上的文件当前大于nPage页，使用VFS xTruncate()方法截断。
+或者，磁盘上的文件小于nPage页。如果试图截断文件为某个大于它当前大小的值，一些操作系统会混乱，所以这种情况要需要进行检测并将一个单独的0字节写到新文件的末尾。
 根据操作结果返回结果码
 */
 static int pager_truncate(Pager *pPager, Pgno nPage){
@@ -2618,20 +2617,20 @@ static int pager_truncate(Pager *pPager, Pgno nPage){
     int szPage = pPager->pageSize;
     assert( pPager->eLock==EXCLUSIVE_LOCK );
     /* TODO: Is it safe to use Pager.dbFileSize here? */
-    rc = sqlite3OsFileSize(pPager->fd, &currentSize);
-    newSize = szPage*(i64)nPage;
+    rc = sqlite3OsFileSize(pPager->fd, &currentSize);			获取磁盘数据库文件的大小（均以字节为单位）
+    newSize = szPage*(i64)nPage;										
     if( rc==SQLITE_OK && currentSize!=newSize ){
-      if( currentSize>newSize ){
+      if( currentSize>newSize ){							如果当前大小>新的大小。截断数据库文件大小为新的大小
         rc = sqlite3OsTruncate(pPager->fd, newSize);
-      }else if( (currentSize+szPage)<=newSize ){
-        char *pTmp = pPager->pTmpSpace;
+      }else if( (currentSize+szPage)<=newSize ){			如果 新的大小>=（当前大小+一个页面的大小）
+        char *pTmp = pPager->pTmpSpace;					为Pager中的临时存储对象分配空间（一个页面大小）
         memset(pTmp, 0, szPage);
         testcase( (newSize-szPage) == currentSize );
         testcase( (newSize-szPage) >  currentSize );
-        rc = sqlite3OsWrite(pPager->fd, pTmp, szPage, newSize-szPage);
+        rc = sqlite3OsWrite(pPager->fd, pTmp, szPage, newSize-szPage);		
       }
       if( rc==SQLITE_OK ){
-        pPager->dbFileSize = nPage;
+        pPager->dbFileSize = nPage;			将对象中当前文件大小设置为新设置的大小（以页面数作为度量）
       }
     }
   }
@@ -3280,6 +3279,7 @@ static int pagerPagecount(Pager *pPager, Pgno *pnPage){
   /* If the current number of pages in the file is greater than the
   ** configured maximum pager number, increase the allowed limit so
   ** that the file can be read.
+  如果当前文件中页数大于配置的最大页号，更新配置的mxPgno的值为当前文件中的页数
   */
   if( nPage>pPager->mxPgno ){
     pPager->mxPgno = (Pgno)nPage;
@@ -3947,10 +3947,10 @@ static void assertTruncateConstraint(Pager *pPager){		迭代cache中每一个脏
 将内存数据库文件镜像截断为nPage个页面。这个函数实际上不改变磁盘上的数据库文件。它只是设置pager对象的内部状态，截断操作在当前事务被提交的时候被进行。
 */
 void sqlite3PagerTruncateImage(Pager *pPager, Pgno nPage){
-  assert( pPager->dbSize>=nPage );							
+  assert( pPager->dbSize>=nPage );						数据库大小>=nPage						
   assert( pPager->eState>=PAGER_WRITER_CACHEMOD );		pager状态>=写缓存（已经被写到日志中）
   pPager->dbSize = nPage;								改变内存中数据库大小（单位：页）
-  assertTruncateConstraint(pPager);
+  assertTruncateConstraint(pPager);						检查PCache中的所有脏页面的页号都小于数据库大小
 }
 
 

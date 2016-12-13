@@ -681,6 +681,7 @@ static void pcache1Shrink(sqlite3_pcache *p){
 
 /*
 ** Implementation of the sqlite3_pcache.xPagecount method. 
+	计算缓存中页面的总数
 */
 static int pcache1Pagecount(sqlite3_pcache *p){
   int n;
