@@ -612,7 +612,14 @@ struct PagerSavepoint {
 **   is always set to SQLITE_FULL, SQLITE_IOERR or one of the SQLITE_IOERR_XXX 		//SQLITE_FULL, SQLITE_IOERR或者SQLITE_IOERR_XXX代码的其中之一
 **   sub-codes.
 */
+<<<<<<< HEAD
 struct Pager {
+=======
+
+
+struct Pager
+ {
+>>>>>>> cf82ad9bbfec120843f25935511b1967374d2c34
   sqlite3_vfs *pVfs;          /* OS functions to use for IO */						//用于IO操作的OS功能
   u8 exclusiveMode;           /* Boolean. True if locking_mode==EXCLUSIVE */		//布尔值。locking_mode==EXCLUSIVE 为true
   u8 journalMode;             /* One of the PAGER_JOURNALMODE_* values */
