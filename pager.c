@@ -614,12 +614,7 @@ struct PagerSavepoint {
 */
 
 
-
-
-
-
-
-
+struct Pager
  {
   sqlite3_vfs *pVfs;          /* OS functions to use for IO */						//用于IO操作的OS功能
   u8 exclusiveMode;           /* Boolean. True if locking_mode==EXCLUSIVE */		//布尔值。locking_mode==EXCLUSIVE 为true
