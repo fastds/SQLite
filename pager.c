@@ -3073,6 +3073,7 @@ static void pager_write_changecounter(PgHdr *pPg){
 ** references, the page content is reloaded from the database. If the
 ** attempt to reload content from the database is required and fails, 
 ** return an SQLite error code. Otherwise, SQLITE_OK.
+当一个wal事务被回滚时，该函数对每一个已被写入日志的页面调用一次。pCtx是对pager对象的指针，iPg是页号
 如果iPg号页面在缓存中并且没有外部引用，则丢弃它。否则，如果有外部引用的话，页面内容从数据库中重新加载。
 
 */
@@ -3101,7 +3102,8 @@ static int pagerUndoCallback(void *pCtx, Pgno iPg){
   ** or more frames have already been written to the log (and therefore 
   ** also copied into the backup databases) as part of this transaction,
   ** the backups must be restarted.
-  */
+  */通常情况下，如果一个事务被回滚，当数据被拷贝到回滚日志文件和数据库时，任何的备份进程被更新。在WAL数据库中，这通常不可能发生，因为回滚仅仅包含了对日志文件的
+  截断。因此，如果存在一个以上的frame已经被作为该事务的一部分写到日志中（并因此被拷贝到备份数据库），该备份必须被重启。
   sqlite3BackupRestart(pPager->pBackup);
 
   return rc;
@@ -3141,7 +3143,8 @@ static int pagerRollbackWal(Pager *pPager){
 **
 ** The list of pages passed into this routine is always sorted by page number.
 ** Hence, if page 1 appears anywhere on the list, it will be the first page.
-
+该函数是sqlite3WalFrames()的包装器。也将以pList为首的页面(通过pDirty连接)的内容记入日志。该函数通知任意活动的备份进程页面已经发生改变。
+传给该函数的页面列表总是按页号排好序的。因此，如果存在page 1 ，一定是第一个页面
 */ 
 static int pagerWalFrames(
   Pager *pPager,                  /* Pager object */
@@ -4420,25 +4423,30 @@ static int subjournalPage(PgHdr *pPg){
 }
 
 /*
-** This function is called by the pcache layer when it has reached some	当达到了某个soft memory限制时，本功能被pcache层调用。第一个参数是Pager对象指针(被转换为void*)
-** soft memory limit. The first argument is a pointer to a Pager object  pager总是‘purgeable’(不是一个内存数据库)。
-** (cast as a void*). The pager is always 'purgeable' (not an in-memory	第二个参数是一个当前为脏page的引用，但是没有外部引用。页面总是与第一个参数Pager对象相关联
+** This function is called by the pcache layer when it has reached some	
+** soft memory limit. The first argument is a pointer to a Pager object  
+** (cast as a void*). The pager is always 'purgeable' (not an in-memory	
 ** database). The second argument is a reference to a page that is 
 ** currently dirty but has no outstanding references. The page
 ** is always associated with the Pager object passed as the first 
 ** argument.
 **
-** The job of this function is to make pPg clean by writing its contents	该函数的工作就是通过将pPg的内容写到数据库文件使其 clean，如果可能的话。本操作可能包含同步
-** out to the database file, if possible. This may involve syncing the		日志文件
+** The job of this function is to make pPg clean by writing its contents	
+** out to the database file, if possible. This may involve syncing the		
 ** journal file. 
 **
-** If successful, sqlite3PcacheMakeClean() is called on the page and		如果成功，sqlite3PcacheMakeClean()在这个page上被调用来让page clean，如果发生IO错误，
-** SQLITE_OK returned. If an IO error occurs while trying to make the		IO错误码被返回。如果页面由于某个原因不能让其clean，但又没有错误发生，那么SQLITE_OK
-** page clean, the IO error code is returned. If the page cannot be			将被返回，sqlite3PcacheMakeClean()不被调用
+** If successful, sqlite3PcacheMakeClean() is called on the page and		
+** SQLITE_OK returned. If an IO error occurs while trying to make the		
+** page clean, the IO error code is returned. If the page cannot be			
 ** made clean for some other reason, but no error occurs, then SQLITE_OK
 ** is returned by sqlite3PcacheMakeClean() is not called.
+当达到了某个soft memory限制时，本功能被pcache层调用。第一个参数是Pager对象指针(被转换为void*)。pager总是‘purgeable’(不是一个内存数据库)。
+第二个参数是一个当前为脏page的引用，但是没有外部引用。页面总是与第一个参数Pager对象相关联
+该函数的工作就是通过将pPg的内容写到数据库文件使其 clean，如果可能的话。本操作可能包含同步日志文件
+如果成功，sqlite3PcacheMakeClean()在这个page上被调用来让page clean，如果发生IO错误，IO错误码被返回。如果页面由于某个原因不能让其clean，但又没有错误发生，那么SQLITE_OK
+将被返回，sqlite3PcacheMakeClean()不被调用
 */
-static int (void *p, PgHdr *pPg){
+static int pagerStress(void *p, PgHdr *pPg){
   Pager *pPager = (Pager *)p;
   int rc = SQLITE_OK;
 
@@ -4459,10 +4467,15 @@ static int (void *p, PgHdr *pPg){
   ** while in the error state, hence it is impossible for this routine to
   ** be called in the error state.  Nevertheless, we include a NEVER()
   ** test for the error state as a safeguard against future changes.
+  
+  doNotSyncSpill标记在日志的同步(并且添加一个新的头部)操作不被允许时被设置。这种情况在这种情况下发生：
+  调用sqlite3PagerWrite()期间试图将属于同一扇区的多个页面写入日志时
+  doNotSpill：防止所有的缓存产生溢出，不管是否请求一个同步操作。该标记在回滚期间被设置。
+  处于错误状态时，溢出被禁止，因为可能会导致数据库损坏。目前的实现是：调用sqlite3PcacheFetch()时，参数createFlag不会被设置为1。
   */
   if( NEVER(pPager->errCode) ) return SQLITE_OK;
-  if( pPager->doNotSpill ) return SQLITE_OK;
-  if( pPager->doNotSyncSpill && (pPg->flags & PGHDR_NEED_SYNC)!=0 ){
+  if( pPager->doNotSpill ) return SQLITE_OK;		未溢出
+  if( pPager->doNotSyncSpill && (pPg->flags & PGHDR_NEED_SYNC)!=0 ){		
     return SQLITE_OK;
   }
 
@@ -4477,7 +4490,7 @@ static int (void *p, PgHdr *pPg){
     }
   }else{
   
-    /* Sync the journal file if required. */
+    /* Sync the journal file if required. */		如果需要，同步日志文件
     if( pPg->flags&PGHDR_NEED_SYNC 
      || pPager->eState==PAGER_WRITER_CACHEMOD
     ){
@@ -5775,23 +5788,23 @@ static int pager_write(PgHdr *pPg){
 **
 ** If an error occurs, SQLITE_NOMEM or an IO error code is returned
 ** as appropriate. Otherwise, SQLITE_OK.
-标记一个页面为可写的。该函数必须要修改页面前被调用。调用者必须在该函数返回SQLITE_OK的情况下才能改变页面数据
+标记一个页面为可写的（写入日志）。该函数必须要修改页面前被调用。调用者必须在该函数返回SQLITE_OK的情况下才能改变页面数据
 
-该函数与pager_write() 的区别：该函数还处理一个特殊情况：一个磁盘扇区上有2个或以上的页面。此时，返回前在同一个扇区中的所有页面必须被写如日志文件。
+该函数与pager_write() 的区别：该函数还处理一个特殊情况：一个磁盘扇区上有2个或以上的页面。此时，在返回前在同一个扇区中的所有页面必须被写到日志文件。
 根据操作结果返回相应的结果码
 */
-int sqlite3PagerWrite(DbPage *pDbPage){
+int sqlite3PagerWrite(DbPage *pDbPage){		
   int rc = SQLITE_OK;
 
-  PgHdr *pPg = pDbPage;
+  PgHdr *pPg = pDbPage;				
   Pager *pPager = pPg->pPager;
-  Pgno nPagePerSector = (pPager->sectorSize/pPager->pageSize);
+  Pgno nPagePerSector = (pPager->sectorSize/pPager->pageSize);				计算一个扇区中存在几个页面
 
   assert( pPager->eState>=PAGER_WRITER_LOCKED );
   assert( pPager->eState!=PAGER_ERROR );
   assert( assert_pager_state(pPager) );
-
-  if( nPagePerSector>1 ){
+	
+  if( nPagePerSector>1 ){						如果一个扇区中的页面数大于1
     Pgno nPageCount;          /* Total number of pages in database file */
     Pgno pg1;                 /* First page of the sector pPg is located on. */
     int nPage = 0;            /* Number of pages starting at pg1 to journal */
@@ -5801,19 +5814,19 @@ int sqlite3PagerWrite(DbPage *pDbPage){
     /* Set the doNotSyncSpill flag to 1. This is because we cannot allow
     ** a journal header to be written between the pages journaled by
     ** this function.
-    */
-    assert( !MEMDB );
+    */	将doNotSyncSpill标记设置为1.这是因为不允许一个日志头被写到页面之间
+    assert( !MEMDB );			//写磁盘操作是针对普通磁盘上的数据库而言的，所以不可能是MEMDB
     assert( pPager->doNotSyncSpill==0 );
     pPager->doNotSyncSpill++;
 
     /* This trick assumes that both the page-size and sector-size are
     ** an integer power of 2. It sets variable pg1 to the identifier
     ** of the first page of the sector pPg is located on.
-    */
+    */这个操作假设页面大小和扇区大小都是2的幂。它将变量pg1设置为pPg所在扇区的第一个页面的标识
     pg1 = ((pPg->pgno-1) & ~(nPagePerSector-1)) + 1;
 
     nPageCount = pPager->dbSize;
-    if( pPg->pgno>nPageCount ){
+    if( pPg->pgno>nPageCount ){					？？？？？？？？？
       nPage = (pPg->pgno - pg1)+1;
     }else if( (pg1+nPagePerSector-1)>nPageCount ){
       nPage = nPageCount+1-pg1;
@@ -5824,25 +5837,25 @@ int sqlite3PagerWrite(DbPage *pDbPage){
     assert(pg1<=pPg->pgno);
     assert((pg1+nPage)>pPg->pgno);
 
-    for(ii=0; ii<nPage && rc==SQLITE_OK; ii++){
+    for(ii=0; ii<nPage && rc==SQLITE_OK; ii++){									循环遍历扇区中的所有页面
       Pgno pg = pg1+ii;
       PgHdr *pPage;
-      if( pg==pPg->pgno || !sqlite3BitvecTest(pPager->pInJournal, pg) ){
+      if( pg==pPg->pgno || !sqlite3BitvecTest(pPager->pInJournal, pg) ){		如果页号==当前要写出的页面的页号 || 页面不在日志中
         if( pg!=PAGER_MJ_PGNO(pPager) ){
-          rc = sqlite3PagerGet(pPager, pg, &pPage);
+          rc = sqlite3PagerGet(pPager, pg, &pPage);								获取页面(如果不在缓存中，可能会从磁盘加载数据到页面)
           if( rc==SQLITE_OK ){
-            rc = pager_write(pPage);
-            if( pPage->flags&PGHDR_NEED_SYNC ){
+            rc = pager_write(pPage);											将页面写入日志，并标记为可写
+            if( pPage->flags&PGHDR_NEED_SYNC ){									设置needSync同步标记（表明该页面需要写入日志）
               needSync = 1;
             }
-            sqlite3PagerUnref(pPage);
+            sqlite3PagerUnref(pPage);											页面写出操作完成，解除对页面的引用
           }
         }
-      }else if( (pPage = pager_lookup(pPager, pg))!=0 ){
+      }else if( (pPage = pager_lookup(pPager, pg))!=0 ){						该页面在当前缓存中查找到
         if( pPage->flags&PGHDR_NEED_SYNC ){
-          needSync = 1;
+          needSync = 1;							设置同步标记（表明该页面需要写入日志）
         }
-        sqlite3PagerUnref(pPage);
+        sqlite3PagerUnref(pPage);												页面写出操作完成，解除对页面的引用
       }
     }
 
@@ -5851,7 +5864,7 @@ int sqlite3PagerWrite(DbPage *pDbPage){
     ** writing to any of these nPage pages may damage the others, the
     ** journal file must contain sync()ed copies of all of them
     ** before any of them can be written out to the database file.
-    */
+    */如果上述任何页面的PGHDR_NEED_SYNC标记被设置，所有页面的同步标记需要被设置。因为对这些页面的任一页面的写操作都会殃及同一扇区中的其他页面
     if( rc==SQLITE_OK && needSync ){
       assert( !MEMDB );
       for(ii=0; ii<nPage; ii++){
@@ -5865,8 +5878,8 @@ int sqlite3PagerWrite(DbPage *pDbPage){
 
     assert( pPager->doNotSyncSpill==1 );
     pPager->doNotSyncSpill--;
-  }else{
-    rc = pager_write(pDbPage);
+  }else{			如果扇区中的页面小于等于1，直接调用pager_write
+    rc = pager_write(pDbPage);				将页面写入日志，并标记为可写
   }
   return rc;
 }
@@ -5895,9 +5908,9 @@ int sqlite3PagerIswriteable(DbPage *pPg){
 **
 ** Tests show that this optimization can quadruple the speed of large 
 ** DELETE operations.
-对这个例程的调用告诉Pager没有必要将页面pPg上的信息写回磁盘，即使该页面可能被标记为脏。 当页面已经添加为freelist的叶子，也就是它的内容不再重要的时候会出现这种情况
+对这个例程的调用告知Pager没有必要将页面pPg上的信息写回磁盘，即使该页面可能被标记为脏。 当页面已经添加为freelist的叶子，也就是它的内容不再重要的时候会出现这种情况
 
-当给定页面上的所有数据都未使用，上层调用这个例程。 pager将页面标记为clean以便的它不会写入磁盘。
+当给定页面上的所有数据都未使用，上层调用这个例程。 pager将页面标记为clean以便的它不会写入磁盘。（发生在这种情况下：该页面内容被删除时候）
 
 测试表明，这种优化可以将DELETE操作速度提高四倍。
 */
@@ -6109,35 +6122,36 @@ int sqlite3PagerCommitPhaseOne(
   PAGERTRACE(("DATABASE SYNC: File=%s zMaster=%s nSize=%d\n", 
       pPager->zFilename, zMaster, pPager->dbSize));
 
-  /* If no database changes have been made, return early. */
+  /* If no database changes have been made, return early. */			如果数据库并未发生改变，返回
   if( pPager->eState<PAGER_WRITER_CACHEMOD ) return SQLITE_OK;
 
   if( MEMDB ){
     /* If this is an in-memory db, or no pages have been written to, or this
     ** function has already been called, it is mostly a no-op.  However, any
     ** backup in progress needs to be restarted.
+	如果这是一个内存数据库，或者没有页面被写入，或者该功能已经被调用，则无操作。否则，进程中任何备份需要被重启
     */
     sqlite3BackupRestart(pPager->pBackup);
-  }else{
-    if( pagerUseWal(pPager) ){
-      PgHdr *pList = sqlite3PcacheDirtyList(pPager->pPCache);
+  }else{	若不是内存数据
+    if( pagerUseWal(pPager) ){								如果Pager使用wal		
+      PgHdr *pList = sqlite3PcacheDirtyList(pPager->pPCache);		获取脏页链表
       PgHdr *pPageOne = 0;
-      if( pList==0 ){
+      if( pList==0 ){		如果没有脏页（必须保持一个页面具有wal提交标记）
         /* Must have at least one page for the WAL commit flag.
-        ** Ticket [2d1a5c67dfc2363e44f29d9bbd57f] 2011-05-18 */
-        rc = sqlite3PagerGet(pPager, 1, &pPageOne);
-        pList = pPageOne;
-        pList->pDirty = 0;
+        ** Ticket [2d1a5c67dfc2363e44f29d9bbd57f] 2011-05-18 */	
+        rc = sqlite3PagerGet(pPager, 1, &pPageOne);		获取第一页
+        pList = pPageOne;								指向该页面
+        pList->pDirty = 0;								下一个没有
       }
       assert( rc==SQLITE_OK );
-      if( ALWAYS(pList) ){
-        rc = pagerWalFrames(pPager, pList, pPager->dbSize, 1);
+      if( ALWAYS(pList) ){								
+        rc = pagerWalFrames(pPager, pList, pPager->dbSize, 1);	
       }
       sqlite3PagerUnref(pPageOne);
       if( rc==SQLITE_OK ){
         sqlite3PcacheCleanAll(pPager->pPCache);
       }
-    }else{
+    }else{	如果pager没有使用wal
       /* The following block updates the change-counter. Exactly how it
       ** does this depends on whether or not the atomic-update optimization
       ** was enabled at compile time, and if this transaction meets the 
