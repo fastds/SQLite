@@ -320,11 +320,7 @@ static PgHdr1 *pcache1AllocPage(PCache1 *pCache){
     p->page.pBuf = pPg;								将页面缓冲区指向刚刚分配的地址
     p->page.pExtra = &p[1];							额外份额配的空间指向自己的首地址
     if( pCache->bPurgeable ){						
-<<<<<<< HEAD
       pCache->pGroup->nCurrentPage++;				缓存的页面数++
-=======
-      pCache->pGroup->nCurrentPage++;				当前已分配且可清除的页面数++
->>>>>>> cf82ad9bbfec120843f25935511b1967374d2c34
     }
     return p;										返回分配好的页面
   }
@@ -858,11 +854,7 @@ static sqlite3_pcache_page *pcache1Fetch(
     if( createFlag==1 ) sqlite3EndBenignMalloc();
   }
 
-<<<<<<< HEAD
   if( pPage ){											设置相关属性，将新分配的page放入哈希表中
-=======
-  if( pPage ){			将分配到的页面插入哈希表中
->>>>>>> cf82ad9bbfec120843f25935511b1967374d2c34
     unsigned int h = iKey % pCache->nHash;
     pCache->nPage++;
     pPage->iKey = iKey;

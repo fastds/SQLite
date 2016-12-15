@@ -612,14 +612,10 @@ struct PagerSavepoint {
 **   is always set to SQLITE_FULL, SQLITE_IOERR or one of the SQLITE_IOERR_XXX 		//SQLITE_FULL, SQLITE_IOERR或者SQLITE_IOERR_XXX代码的其中之一
 **   sub-codes.
 */
-<<<<<<< HEAD
-struct Pager {
-=======
-
 
 struct Pager
  {
->>>>>>> cf82ad9bbfec120843f25935511b1967374d2c34
+
   sqlite3_vfs *pVfs;          /* OS functions to use for IO */						//用于IO操作的OS功能
   u8 exclusiveMode;           /* Boolean. True if locking_mode==EXCLUSIVE */		//布尔值。locking_mode==EXCLUSIVE 为true
   u8 journalMode;             /* One of the PAGER_JOURNALMODE_* values */
@@ -671,7 +667,7 @@ struct Pager
   ** End of the routinely-changing class members
   ***************************************************************************/
 
-  u16 nExtra;                 /* Add this many bytes to each in-memory page */		//每个内存页面增加的额外字节
+  u16 nExtra;                 /* Add this many bytes to each in-memory page */		//每个内存页面增加的额外字节，【存放内存数据库的恢复数据】
   i16 nReserve;               /* Number of unused bytes at end of each page */		//每个页面未使用的字节数（一般为0）
   u32 vfsFlags;               /* Flags for sqlite3_vfs.xOpen() */					//sqlite3_vfs.xOpen()标记
   u32 sectorSize;             /* Assumed sector size during rollback */				//回滚期间假定的扇区大小
