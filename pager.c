@@ -5318,6 +5318,7 @@ int sqlite3PagerAcquire(
 
   /* If the pager is in the error state, return an error immediately. 
   ** Otherwise, request the page from the PCache layer. */
+  如果pager处于错误状态，立马返回。否则，从PCache层请求page
   if( pPager->errCode!=SQLITE_OK ){
     rc = pPager->errCode;
   }else{			如果pager状态正常，调用sqlite3PcacheFetch来获取页面
@@ -5379,7 +5380,7 @@ int sqlite3PagerAcquire(
       }
       memset(pPg->pData, 0, pPager->pageSize);
       IOTRACE(("ZERO %p %d\n", pPager, pgno));
-    }else{		else分支：需要从磁盘获取数据
+    }else{		else分支：需要从磁盘获取数据 非内存数据库、请求页号小于数据库大小、数据库文件句柄打开、需要填充内容
       assert( pPg->pPager==pPager );
       pPager->aStat[PAGER_STAT_MISS]++;		未命中缓存
       rc = readDbPage(pPg);					从数据库加载页面
