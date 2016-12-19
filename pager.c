@@ -1050,13 +1050,15 @@ static int write32bits(sqlite3_file *fd, i64 offset, u32 val){
 }
 
 /*
-** Unlock the database file to level eLock, which must be either NO_LOCK 		释放数据库文件上的锁并设置为第二个参数，eLock要么为NO_LOCK要么为SHARE_LOCK。
-** or SHARED_LOCK. Regardless of whether or not the call to xUnlock()			不管是否xUnlock()调用成功，Pager.eLock设置为与新锁对应的值
+** Unlock the database file to level eLock, which must be either NO_LOCK 		
+** or SHARED_LOCK. Regardless of whether or not the call to xUnlock()			
 ** succeeds, set the Pager.eLock variable to match the (attempted) new lock.
 **
-** Except, if Pager.eLock is set to UNKNOWN_LOCK when this function is			此外，如果Pager.eLock被设置为UNKNOWN_LOCK，不要修改它。原因见上述#define 的注释
+** Except, if Pager.eLock is set to UNKNOWN_LOCK when this function is			
 ** called, do not modify it. See the comment above the #define of 
 ** UNKNOWN_LOCK for an explanation of this.
+释放数据库文件上的锁并设置为第二个参数，eLock要么为NO_LOCK要么为SHARE_LOCK。不管是否xUnlock()调用成功，Pager.eLock设置为与新锁对应的值
+此外，如果Pager.eLock被设置为UNKNOWN_LOCK，不要修改它。原因见上述#define 的注释
 */
 static int pagerUnlockDb(Pager *pPager, int eLock){
   int rc = SQLITE_OK;
@@ -1064,11 +1066,11 @@ static int pagerUnlockDb(Pager *pPager, int eLock){
   assert( !pPager->exclusiveMode || pPager->eLock==eLock );
   assert( eLock==NO_LOCK || eLock==SHARED_LOCK );
   assert( eLock!=NO_LOCK || pagerUseWal(pPager)==0 );
-  if( isOpen(pPager->fd) ){
-    assert( pPager->eLock>=eLock );
-    rc = sqlite3OsUnlock(pPager->fd, eLock);
-    if( pPager->eLock!=UNKNOWN_LOCK ){
-      pPager->eLock = (u8)eLock;
+  if( isOpen(pPager->fd) ){		日志文件已打开
+    assert( pPager->eLock>=eLock );		pager当前持有的锁>=要设置的锁
+    rc = sqlite3OsUnlock(pPager->fd, eLock);		调用OS的API函数完成对数据库文件的解锁操作。
+    if( pPager->eLock!=UNKNOWN_LOCK ){			如果pager当前的锁状态 != UNKNOW_LOCK
+      pPager->eLock = (u8)eLock;			更新当前锁为参数指定的锁
     }
     IOTRACE(("UNLOCK %p %d\n", pPager, eLock))
   }
@@ -2766,21 +2768,25 @@ static void setSectorSize(Pager *pPager){
 */
 static int pager_playback(Pager *pPager, int isHot){
   sqlite3_vfs *pVfs = pPager->pVfs;
-  i64 szJ;                 /* Size of the journal file in bytes */
-  u32 nRec;                /* Number of Records in the journal */
-  u32 u;                   /* Unsigned loop counter */
-  Pgno mxPg = 0;           /* Size of the original file in pages */
-  int rc;                  /* Result code of a subroutine */
-  int res = 1;             /* Value returned by sqlite3OsAccess() */
-  char *zMaster = 0;       /* Name of master journal file if any */
-  int needPagerReset;      /* True to reset page prior to first page rollback */
+  i64 szJ;                 /* Size of the journal file in bytes */		日志文件的字节大小
+  u32 nRec;                /* Number of Records in the journal */		日志文件中的记录数
+  u32 u;                   /* Unsigned loop counter */					无符号循环计数器
+  Pgno mxPg = 0;           /* Size of the original file in pages */		原始数据库文件的页面大小(最大页号)
+  int rc;                  /* Result code of a subroutine */			子例程的结果码
+  int res = 1;             /* Value returned by sqlite3OsAccess() */	sqlite3OsAccess()的返回值
+  char *zMaster = 0;       /* Name of master journal file if any */		master日志文件名（如果有的话）
+  int needPagerReset;      /* True to reset page prior to first page rollback */	在第一次页面回滚时重置页面？？
 
   /* Figure out how many records are in the journal.  Abort early if
   ** the journal is empty.
+<<<<<<< HEAD
   计算日志文件中有多少条记录。如果日志文件是空的，则返回
+=======
+  计算出日志文件中有多少日志记录。如果日志是空的，则中断操作。
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
   */
   assert( isOpen(pPager->jfd) );
-  rc = sqlite3OsFileSize(pPager->jfd, &szJ);
+  rc = sqlite3OsFileSize(pPager->jfd, &szJ);		读取日志文件的字节大小
   if( rc!=SQLITE_OK ){
     goto end_playback;
   }
@@ -2795,7 +2801,14 @@ static int pager_playback(Pager *pPager, int isHot){
   ** (pPager->pageSize >= pPager->pVfs->mxPathname+1). Using os_unix.c,
   **  mxPathname is 512, which is the same as the minimum allowable value
   ** for pageSize.
+<<<<<<< HEAD
   从回滚日志中读取master日志名。如果指定了一个master日志名，但是日志文件未在磁盘上，表明当前日志不是热日志并且无需回滚。
+=======
+  从日志文件中读取master日志名，如果存在的话。如果指定了一个master日志文件名，但是该master文件没有在磁盘上，那么日志不是热日志，且无需回滚。
+  
+  技术上，下述操作是错误的，因为它假设缓冲区Pager.pTmpSpace为(mxPathname+1)字节或者更大pPager->pageSize >= pPager->pVfs->mxPathname+1)。
+  使用 os_unix.c，最大路径名为512，该值与允许的最小页面大小相同。
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
   */
   zMaster = pPager->pTmpSpace;
   rc = readMasterJournal(pPager->jfd, zMaster, pPager->pVfs->mxPathname+1);		读master日志名
@@ -2812,14 +2825,25 @@ static int pager_playback(Pager *pPager, int isHot){
   /* This loop terminates either when a readJournalHdr() or 
   ** pager_playback_one_page() call returns SQLITE_DONE or an IO error 
   ** occurs. 
+<<<<<<< HEAD
   当readJournalHdr()或者 pager_playback_one_page()返回 SQLITE_DONE或发生IO错误，则循环中断
+=======
+  满足以下条件之一，循环终止：
+  1. readJournalHdr()或者pager_playback_one_page()调用返回SQLITE_DONE
+  2. 发生IO错误
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
   */
   while( 1 ){
     /* Read the next journal header from the journal file.  If there are
     ** not enough bytes left in the journal file for a complete header, or
     ** it is corrupted, then a process must have failed while writing it.
     ** This indicates nothing more needs to be rolled back.
+<<<<<<< HEAD
 	读取下一个日志头。如果剩余字节数小于日志文件头的大小，则表明没有其他的需要被回滚。
+=======
+	从日志文件中读取一下个日志头。如果日志文件中剩余的字节数不足以作为一个完整的文件头，或者发生崩溃，那么进程在对它进行写操作时已经失败。
+	表示没有内容需要回滚
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
     */
     rc = readJournalHdr(pPager, isHot, szJ, &nRec, &mxPg);
     if( rc!=SQLITE_OK ){ 
@@ -2833,7 +2857,11 @@ static int pager_playback(Pager *pPager, int isHot){
     ** working in no-sync mode. This means that the rest of the journal
     ** file consists of pages, there are no more journal headers. Compute
     ** the value of nRec based on this assumption.
+<<<<<<< HEAD
 	如果nRec为0xffffffff，表明进程以异步方式运行。表明日志剩余的部分由多个页面构成，已没有更多日志头，并根据文件大小计算记录数
+=======
+	如果nRec为0xffffffff，那么该日志由一个工作与非同步模式的进程创建。这意味着日志的剩余部分由页面构成。后续已经没有日志头。基于这个假设来计算nRec 的值
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
     */
     if( nRec==0xffffffff ){
       assert( pPager->journalOff==JOURNAL_HDR_SZ(pPager) );
@@ -2853,7 +2881,14 @@ static int pager_playback(Pager *pPager, int isHot){
     ** the journal, it means that the journal might contain additional
     ** pages that need to be rolled back and that the number of pages 
     ** should be computed based on the journal file size.
+<<<<<<< HEAD
 	如果nRec is 0 ，并且
+=======
+	如果nRec为0，并且该回滚属于该进程创建的事务，并且如果日志中粗壮乃最后一个头，那么以为这日志的这一部分将被填充，还未同步到磁盘。基于剩余的文件大小计算页面数。
+	
+	该测试的第三个term被添加到第六ticket #2565.当回滚一个热日志时，nRec==0总是意味着日志的下一个chunk包含着要被回滚的0填充的页面。但是当进行一个回滚操作并且nRec==0
+	chunk
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
     */
     if( nRec==0 && !isHot &&
         pPager->journalHdr+JOURNAL_HDR_SZ(pPager)==pPager->journalOff ){
@@ -3076,6 +3111,7 @@ static void pager_write_changecounter(PgHdr *pPg){
 ** references, the page content is reloaded from the database. If the
 ** attempt to reload content from the database is required and fails, 
 ** return an SQLite error code. Otherwise, SQLITE_OK.
+当一个wal事务被回滚时，该函数对每一个已被写入日志的页面调用一次。pCtx是对pager对象的指针，iPg是页号
 如果iPg号页面在缓存中并且没有外部引用，则丢弃它。否则，如果有外部引用的话，页面内容从数据库中重新加载。
 
 */
@@ -3104,7 +3140,8 @@ static int pagerUndoCallback(void *pCtx, Pgno iPg){
   ** or more frames have already been written to the log (and therefore 
   ** also copied into the backup databases) as part of this transaction,
   ** the backups must be restarted.
-  */
+  */通常情况下，如果一个事务被回滚，当数据被拷贝到回滚日志文件和数据库时，任何的备份进程被更新。在WAL数据库中，这通常不可能发生，因为回滚仅仅包含了对日志文件的
+  截断。因此，如果存在一个以上的frame已经被作为该事务的一部分写到日志中（并因此被拷贝到备份数据库），该备份必须被重启。
   sqlite3BackupRestart(pPager->pBackup);
 
   return rc;
@@ -3144,7 +3181,8 @@ static int pagerRollbackWal(Pager *pPager){
 **
 ** The list of pages passed into this routine is always sorted by page number.
 ** Hence, if page 1 appears anywhere on the list, it will be the first page.
-
+该函数是sqlite3WalFrames()的包装器。也将以pList为首的页面(通过pDirty连接)的内容记入日志。该函数通知任意活动的备份进程页面已经发生改变。
+传给该函数的页面列表总是按页号排好序的。因此，如果存在page 1 ，一定是第一个页面
 */ 
 static int pagerWalFrames(
   Pager *pPager,                  /* Pager object */
@@ -4423,25 +4461,30 @@ static int subjournalPage(PgHdr *pPg){
 }
 
 /*
-** This function is called by the pcache layer when it has reached some	当达到了某个soft memory限制时，本功能被pcache层调用。第一个参数是Pager对象指针(被转换为void*)
-** soft memory limit. The first argument is a pointer to a Pager object  pager总是‘purgeable’(不是一个内存数据库)。
-** (cast as a void*). The pager is always 'purgeable' (not an in-memory	第二个参数是一个当前为脏page的引用，但是没有外部引用。页面总是与第一个参数Pager对象相关联
+** This function is called by the pcache layer when it has reached some	
+** soft memory limit. The first argument is a pointer to a Pager object  
+** (cast as a void*). The pager is always 'purgeable' (not an in-memory	
 ** database). The second argument is a reference to a page that is 
 ** currently dirty but has no outstanding references. The page
 ** is always associated with the Pager object passed as the first 
 ** argument.
 **
-** The job of this function is to make pPg clean by writing its contents	该函数的工作就是通过将pPg的内容写到数据库文件使其 clean，如果可能的话。本操作可能包含同步
-** out to the database file, if possible. This may involve syncing the		日志文件
+** The job of this function is to make pPg clean by writing its contents	
+** out to the database file, if possible. This may involve syncing the		
 ** journal file. 
 **
-** If successful, sqlite3PcacheMakeClean() is called on the page and		如果成功，sqlite3PcacheMakeClean()在这个page上被调用来让page clean，如果发生IO错误，
-** SQLITE_OK returned. If an IO error occurs while trying to make the		IO错误码被返回。如果页面由于某个原因不能让其clean，但又没有错误发生，那么SQLITE_OK
-** page clean, the IO error code is returned. If the page cannot be			将被返回，sqlite3PcacheMakeClean()不被调用
+** If successful, sqlite3PcacheMakeClean() is called on the page and		
+** SQLITE_OK returned. If an IO error occurs while trying to make the		
+** page clean, the IO error code is returned. If the page cannot be			
 ** made clean for some other reason, but no error occurs, then SQLITE_OK
 ** is returned by sqlite3PcacheMakeClean() is not called.
+当达到了某个soft memory限制时，本功能被pcache层调用。第一个参数是Pager对象指针(被转换为void*)。pager总是‘purgeable’(不是一个内存数据库)。
+第二个参数是一个当前为脏page的引用，但是没有外部引用。页面总是与第一个参数Pager对象相关联
+该函数的工作就是通过将pPg的内容写到数据库文件使其 clean，如果可能的话。本操作可能包含同步日志文件
+如果成功，sqlite3PcacheMakeClean()在这个page上被调用来让page clean，如果发生IO错误，IO错误码被返回。如果页面由于某个原因不能让其clean，但又没有错误发生，那么SQLITE_OK
+将被返回，sqlite3PcacheMakeClean()不被调用
 */
-static int (void *p, PgHdr *pPg){
+static int pagerStress(void *p, PgHdr *pPg){
   Pager *pPager = (Pager *)p;
   int rc = SQLITE_OK;
 
@@ -4462,10 +4505,15 @@ static int (void *p, PgHdr *pPg){
   ** while in the error state, hence it is impossible for this routine to
   ** be called in the error state.  Nevertheless, we include a NEVER()
   ** test for the error state as a safeguard against future changes.
+  
+  doNotSyncSpill标记在日志的同步(并且添加一个新的头部)操作不被允许时被设置。这种情况在这种情况下发生：
+  调用sqlite3PagerWrite()期间试图将属于同一扇区的多个页面写入日志时
+  doNotSpill：防止所有的缓存产生溢出，不管是否请求一个同步操作。该标记在回滚期间被设置。
+  处于错误状态时，溢出被禁止，因为可能会导致数据库损坏。目前的实现是：调用sqlite3PcacheFetch()时，参数createFlag不会被设置为1。
   */
   if( NEVER(pPager->errCode) ) return SQLITE_OK;
-  if( pPager->doNotSpill ) return SQLITE_OK;
-  if( pPager->doNotSyncSpill && (pPg->flags & PGHDR_NEED_SYNC)!=0 ){
+  if( pPager->doNotSpill ) return SQLITE_OK;		未溢出
+  if( pPager->doNotSyncSpill && (pPg->flags & PGHDR_NEED_SYNC)!=0 ){		
     return SQLITE_OK;
   }
 
@@ -4480,7 +4528,7 @@ static int (void *p, PgHdr *pPg){
     }
   }else{
   
-    /* Sync the journal file if required. */
+    /* Sync the journal file if required. */		如果需要，同步日志文件
     if( pPg->flags&PGHDR_NEED_SYNC 
      || pPager->eState==PAGER_WRITER_CACHEMOD
     ){
@@ -5041,7 +5089,7 @@ int sqlite3PagerSharedLock(Pager *pPager){
   ** outstanding pages. This implies that the pager state should either
   ** be OPEN or READER. READER is only possible if the pager is or was in 
   ** exclusive access mode.
-  该例程仅仅从b-tree处且在没有外部页面的时候被调用。暗示：pager状态要么OPEN或READER。仅当pager是或者处于互斥状态时才可能是READER状态
+  该例程仅仅从b-tree处且在没有外部页面的时候被调用。暗示：pager状态要么OPEN或READER。仅当pager是或者曾处于互斥状态时仅可能是READER状态
   */
   assert( sqlite3PcacheRefCount(pPager->pPCache)==0 );			//当前pager没有页面被引用
   assert( assert_pager_state(pPager) );
@@ -5061,7 +5109,11 @@ int sqlite3PagerSharedLock(Pager *pPager){
 
     /* If a journal file exists, and there is no RESERVED lock on the
     ** database file, then it either needs to be played back or deleted.
+<<<<<<< HEAD
 	如果存在日志文件，并且数据库文件上不持有RESERVED锁，要么回滚，要么删除
+=======
+	如果日志文件存在，并且没有进程持有数据库文件上的互斥锁，要么回放要么删除。
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
     */
     if( pPager->eLock<=SHARED_LOCK ){
       rc = hasHotJournal(pPager, &bHotJournal);
@@ -5084,6 +5136,11 @@ int sqlite3PagerSharedLock(Pager *pPager){
       **
       ** Unless the pager is in locking_mode=exclusive mode, the lock is
       ** downgraded to SHARED_LOCK before this function returns.
+	  获取数据库文件上的互斥锁。重要的是在获取EXCLUSIVE之前没有持有一个RESERVED锁。如果有，表明另外一个进程可能打开了数据库文件，导致检测到了RESERVED锁，并且可以知道当该进程依然回滚热日志时数据库对于读操作是安全的。
+	  
+	  因为中间的RESERVED锁不被请求，任何其他的试图访问数据库文件的进程将在程序到达这一点时获取EXCLUSICE锁失败。
+	  
+	  除非pager处于模式locking_mode=exclusive 中，该锁在该函数返回之前降级为SHARED_LOCK
       */
       rc = pagerLockDb(pPager, EXCLUSIVE_LOCK);						获取EXCLUSIVE锁
       if( rc!=SQLITE_OK ){
@@ -5102,6 +5159,9 @@ int sqlite3PagerSharedLock(Pager *pPager){
       ** this connection obtained the exclusive lock above. Or, it 
       ** may mean that the pager was in the error-state when this
       ** function was called and the journal file does not exist.
+	  如果日志文件还未打开并且文件存在于磁盘上，打开日志文件的读/写访问。对日志文件的写操作是需要的，因为在互斥访问模式下，文件描述符将一直保持打开并且可能被用于之后的事务当中。并且，写访问通常在journal_mode=persist下要求销毁日志
+	  
+	  如果日志不存在，通常意味着在这个连接获得互斥锁之前，某个其他连接设法进入该文件或者将其回滚。或者，意味着pager在该函数被调用时处于错误状态，并且日志文件不存在。
       */
       if( !isOpen(pPager->jfd) ){			如果日志未打开
         sqlite3_vfs * const pVfs = pPager->pVfs;
@@ -5128,6 +5188,7 @@ int sqlite3PagerSharedLock(Pager *pPager){
       ** it back since the process that crashed and left the hot journal
       ** probably did not sync it and we are required to always sync
       ** the journal before playing it back.
+	  日志重放并且删除日志。移除数据库上的写锁并请求读锁。在重放热日志之前清除缓存以便不处于缓存状态的不一致。在重放之前将热日志同步，因为崩溃的进程可能还未进行热日志的同步操作，我们在重放它之前总是会进行同步。
       */
       if( isOpen(pPager->jfd) ){			打开成功
         assert( rc==SQLITE_OK );
@@ -5156,6 +5217,10 @@ int sqlite3PagerSharedLock(Pager *pPager){
         ** assert_pager_state() would fail now, as it should not be possible
         ** to be in ERROR state when there are zero outstanding page 
         ** references.
+		在试图打开或者回滚一个持有互斥锁的热日志时，该分支运行。pager_unlock()函数会在返回以解锁文件之前被调用。如果解锁失败，pager.eLock必须被设置为 UNKNOWN_LOCK (见上述注释)
+		
+		为了是的pager_unlock()这样做，设置Pager.eState 为ERROR。这实际上不算作上述pager状态转换图中ERROR状态转换的一部分，因为对于pager_unlock()相同的调用将立即将pager转换为OPEN状态。现在调用assert_pager_state() 会发生失败，
+		当外部引用的页面为0的时候，因为不可能处于错误状态。
         */
         pager_error(pPager, rc);
         goto failed;
@@ -5167,8 +5232,13 @@ int sqlite3PagerSharedLock(Pager *pPager){
       );
     }
 
+<<<<<<< HEAD
     if( !pPager->tempFile 
      && (pPager->pBackup || sqlite3PcachePagecount(pPager->pPCache)>0) 			非临时文件 && （存在备份||存在已换存的页）
+=======
+    if( !pPager->tempFile 		非临时文件 && （有备份|| 缓存中的页数>0）
+     && (pPager->pBackup || sqlite3PcachePagecount(pPager->pPCache)>0) 
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
     ){
       /* The shared-lock has just been acquired on the database file
       ** and there are already pages in the cache (from a previous
@@ -5185,6 +5255,11 @@ int sqlite3PagerSharedLock(Pager *pPager){
       ** There is a vanishingly small chance that a change will not be 
       ** detected.  The chance of an undetected change is so small that
       ** it can be neglected.
+	  获取数据库文件上的共享锁，并且缓存中存在页面（来自于之前的读或者写事务）检查数据库是否被修改。如果数据库已经改变，刷新缓冲区。
+	  
+	  数据库的修改通过查看头文件偏移量24位置的16字节。如果数据库已经被修改。这16个字节的头14个字节是一个32-位的计数器，该计数器在每一次会随着每次的改变而递增。其他字节随着文件的改变随机发生改变(使用一个codec时)
+	  
+	  有一个很小的可能下，可能一个改变不会被检测到。就是一个未被检测的改变过于小以至于可能被忽略
       */
       Pgno nPage = 0;
       char dbFileVers[sizeof(pPager->dbFileVers)];
@@ -5203,12 +5278,13 @@ int sqlite3PagerSharedLock(Pager *pPager){
       }
 
       if( memcmp(pPager->dbFileVers, dbFileVers, sizeof(dbFileVers))!=0 ){
-        pager_reset(pPager);
+        pager_reset(pPager);			//丢弃缓冲区内容
       }
     }
 
     /* If there is a WAL file in the file-system, open this database in WAL
     ** mode. Otherwise, the following function call is a no-op.
+	如果文件系统中有一个WAL文件，在WAL模式下打开该数据库。否则，随后的函数调用无操作。
     */
     rc = pagerOpenWalIfPresent(pPager);
 #ifndef SQLITE_OMIT_WAL
@@ -5216,8 +5292,9 @@ int sqlite3PagerSharedLock(Pager *pPager){
 #endif
   }
 
-  if( pagerUseWal(pPager) ){
+  if( pagerUseWal(pPager) ){			使用了WAL
     assert( rc==SQLITE_OK );
+<<<<<<< HEAD
     rc = pagerBeginReadTransaction(pPager);		开启读事物
   }
 
@@ -5232,6 +5309,22 @@ int sqlite3PagerSharedLock(Pager *pPager){
     assert( pPager->eState==PAGER_OPEN );	
   }else{
     pPager->eState = PAGER_READER;		
+=======
+    rc = pagerBeginReadTransaction(pPager);			开启一个读事务
+  }
+
+  if( pPager->eState==PAGER_OPEN && rc==SQLITE_OK ){
+    rc = pagerPagecount(pPager, &pPager->dbSize);		获取数据库大小（页数）
+  }
+
+ failed:
+  if( rc!=SQLITE_OK ){	如果rc为错误结果码
+    assert( !MEMDB );	
+    pager_unlock(pPager);				释放数据库上的锁
+    assert( pPager->eState==PAGER_OPEN );
+  }else{		如果rc为非错误码
+    pPager->eState = PAGER_READER;		则pager状态为PAGER_READER
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
   }
   return rc;
 }
@@ -5243,10 +5336,12 @@ int sqlite3PagerSharedLock(Pager *pPager){
 ** Except, in locking_mode=EXCLUSIVE when there is nothing to in
 ** the rollback journal, the unlock is not performed and there is
 ** nothing to rollback, so this routine is a no-op.
+如果引用数为0，回滚任何活动的事务并释放pager上的锁
+此外，如果处于locking_mode=EXCLUSIVE模式下，回滚日志为空，解锁操作不被执行并且没有需要回顾的内容，即该函数什么都不做。
 */ 
 static void pagerUnlockIfUnused(Pager *pPager){
-  if( (sqlite3PcacheRefCount(pPager->pPCache)==0) ){
-    pagerUnlockAndRollback(pPager);
+  if( (sqlite3PcacheRefCount(pPager->pPCache)==0) ){			检测引用数==0(没有页面被使用)
+    pagerUnlockAndRollback(pPager);					解锁并回滚
   }
 }
 
@@ -5787,23 +5882,23 @@ static int pager_write(PgHdr *pPg){
 **
 ** If an error occurs, SQLITE_NOMEM or an IO error code is returned
 ** as appropriate. Otherwise, SQLITE_OK.
-标记一个页面为可写的。该函数必须要修改页面前被调用。调用者必须在该函数返回SQLITE_OK的情况下才能改变页面数据
+标记一个页面为可写的（写入日志）。该函数必须要修改页面前被调用。调用者必须在该函数返回SQLITE_OK的情况下才能改变页面数据
 
-该函数与pager_write() 的区别：该函数还处理一个特殊情况：一个磁盘扇区上有2个或以上的页面。此时，返回前在同一个扇区中的所有页面必须被写如日志文件。
+该函数与pager_write() 的区别：该函数还处理一个特殊情况：一个磁盘扇区上有2个或以上的页面。此时，在返回前在同一个扇区中的所有页面必须被写到日志文件。
 根据操作结果返回相应的结果码
 */
-int sqlite3PagerWrite(DbPage *pDbPage){
+int sqlite3PagerWrite(DbPage *pDbPage){		
   int rc = SQLITE_OK;
 
-  PgHdr *pPg = pDbPage;
+  PgHdr *pPg = pDbPage;				
   Pager *pPager = pPg->pPager;
-  Pgno nPagePerSector = (pPager->sectorSize/pPager->pageSize);
+  Pgno nPagePerSector = (pPager->sectorSize/pPager->pageSize);				计算一个扇区中存在几个页面
 
   assert( pPager->eState>=PAGER_WRITER_LOCKED );
   assert( pPager->eState!=PAGER_ERROR );
   assert( assert_pager_state(pPager) );
-
-  if( nPagePerSector>1 ){
+	
+  if( nPagePerSector>1 ){						如果一个扇区中的页面数大于1
     Pgno nPageCount;          /* Total number of pages in database file */
     Pgno pg1;                 /* First page of the sector pPg is located on. */
     int nPage = 0;            /* Number of pages starting at pg1 to journal */
@@ -5813,19 +5908,19 @@ int sqlite3PagerWrite(DbPage *pDbPage){
     /* Set the doNotSyncSpill flag to 1. This is because we cannot allow
     ** a journal header to be written between the pages journaled by
     ** this function.
-    */
-    assert( !MEMDB );
+    */	将doNotSyncSpill标记设置为1.这是因为不允许一个日志头被写到页面之间
+    assert( !MEMDB );			//写磁盘操作是针对普通磁盘上的数据库而言的，所以不可能是MEMDB
     assert( pPager->doNotSyncSpill==0 );
     pPager->doNotSyncSpill++;
 
     /* This trick assumes that both the page-size and sector-size are
     ** an integer power of 2. It sets variable pg1 to the identifier
     ** of the first page of the sector pPg is located on.
-    */
+    */这个操作假设页面大小和扇区大小都是2的幂。它将变量pg1设置为pPg所在扇区的第一个页面的标识
     pg1 = ((pPg->pgno-1) & ~(nPagePerSector-1)) + 1;
 
     nPageCount = pPager->dbSize;
-    if( pPg->pgno>nPageCount ){
+    if( pPg->pgno>nPageCount ){					？？？？？？？？？
       nPage = (pPg->pgno - pg1)+1;
     }else if( (pg1+nPagePerSector-1)>nPageCount ){
       nPage = nPageCount+1-pg1;
@@ -5836,25 +5931,25 @@ int sqlite3PagerWrite(DbPage *pDbPage){
     assert(pg1<=pPg->pgno);
     assert((pg1+nPage)>pPg->pgno);
 
-    for(ii=0; ii<nPage && rc==SQLITE_OK; ii++){
+    for(ii=0; ii<nPage && rc==SQLITE_OK; ii++){									循环遍历扇区中的所有页面
       Pgno pg = pg1+ii;
       PgHdr *pPage;
-      if( pg==pPg->pgno || !sqlite3BitvecTest(pPager->pInJournal, pg) ){
+      if( pg==pPg->pgno || !sqlite3BitvecTest(pPager->pInJournal, pg) ){		如果页号==当前要写出的页面的页号 || 页面不在日志中
         if( pg!=PAGER_MJ_PGNO(pPager) ){
-          rc = sqlite3PagerGet(pPager, pg, &pPage);
+          rc = sqlite3PagerGet(pPager, pg, &pPage);								获取页面(如果不在缓存中，可能会从磁盘加载数据到页面)
           if( rc==SQLITE_OK ){
-            rc = pager_write(pPage);
-            if( pPage->flags&PGHDR_NEED_SYNC ){
+            rc = pager_write(pPage);											将页面写入日志，并标记为可写
+            if( pPage->flags&PGHDR_NEED_SYNC ){									设置needSync同步标记（表明该页面需要写入日志）
               needSync = 1;
             }
-            sqlite3PagerUnref(pPage);
+            sqlite3PagerUnref(pPage);											页面写出操作完成，解除对页面的引用
           }
         }
-      }else if( (pPage = pager_lookup(pPager, pg))!=0 ){
+      }else if( (pPage = pager_lookup(pPager, pg))!=0 ){						该页面在当前缓存中查找到
         if( pPage->flags&PGHDR_NEED_SYNC ){
-          needSync = 1;
+          needSync = 1;							设置同步标记（表明该页面需要写入日志）
         }
-        sqlite3PagerUnref(pPage);
+        sqlite3PagerUnref(pPage);												页面写出操作完成，解除对页面的引用
       }
     }
 
@@ -5863,7 +5958,7 @@ int sqlite3PagerWrite(DbPage *pDbPage){
     ** writing to any of these nPage pages may damage the others, the
     ** journal file must contain sync()ed copies of all of them
     ** before any of them can be written out to the database file.
-    */
+    */如果上述任何页面的PGHDR_NEED_SYNC标记被设置，所有页面的同步标记需要被设置。因为对这些页面的任一页面的写操作都会殃及同一扇区中的其他页面
     if( rc==SQLITE_OK && needSync ){
       assert( !MEMDB );
       for(ii=0; ii<nPage; ii++){
@@ -5877,8 +5972,8 @@ int sqlite3PagerWrite(DbPage *pDbPage){
 
     assert( pPager->doNotSyncSpill==1 );
     pPager->doNotSyncSpill--;
-  }else{
-    rc = pager_write(pDbPage);
+  }else{			如果扇区中的页面小于等于1，直接调用pager_write
+    rc = pager_write(pDbPage);				将页面写入日志，并标记为可写
   }
   return rc;
 }
@@ -5907,9 +6002,9 @@ int sqlite3PagerIswriteable(DbPage *pPg){
 **
 ** Tests show that this optimization can quadruple the speed of large 
 ** DELETE operations.
-对这个例程的调用告诉Pager没有必要将页面pPg上的信息写回磁盘，即使该页面可能被标记为脏。 当页面已经添加为freelist的叶子，也就是它的内容不再重要的时候会出现这种情况
+对这个例程的调用告知Pager没有必要将页面pPg上的信息写回磁盘，即使该页面可能被标记为脏。 当页面已经添加为freelist的叶子，也就是它的内容不再重要的时候会出现这种情况
 
-当给定页面上的所有数据都未使用，上层调用这个例程。 pager将页面标记为clean以便的它不会写入磁盘。
+当给定页面上的所有数据都未使用，上层调用这个例程。 pager将页面标记为clean以便的它不会写入磁盘。（发生在这种情况下：该页面内容被删除时候）
 
 测试表明，这种优化可以将DELETE操作速度提高四倍。
 */
@@ -6121,35 +6216,36 @@ int sqlite3PagerCommitPhaseOne(
   PAGERTRACE(("DATABASE SYNC: File=%s zMaster=%s nSize=%d\n", 
       pPager->zFilename, zMaster, pPager->dbSize));
 
-  /* If no database changes have been made, return early. */
+  /* If no database changes have been made, return early. */			如果数据库并未发生改变，返回
   if( pPager->eState<PAGER_WRITER_CACHEMOD ) return SQLITE_OK;
 
   if( MEMDB ){
     /* If this is an in-memory db, or no pages have been written to, or this
     ** function has already been called, it is mostly a no-op.  However, any
     ** backup in progress needs to be restarted.
+	如果这是一个内存数据库，或者没有页面被写入，或者该功能已经被调用，则无操作。否则，进程中任何备份需要被重启
     */
     sqlite3BackupRestart(pPager->pBackup);
-  }else{
-    if( pagerUseWal(pPager) ){
-      PgHdr *pList = sqlite3PcacheDirtyList(pPager->pPCache);
+  }else{	若不是内存数据
+    if( pagerUseWal(pPager) ){								如果Pager使用wal		
+      PgHdr *pList = sqlite3PcacheDirtyList(pPager->pPCache);		获取脏页链表
       PgHdr *pPageOne = 0;
-      if( pList==0 ){
+      if( pList==0 ){		如果没有脏页（必须保持一个页面具有wal提交标记）
         /* Must have at least one page for the WAL commit flag.
-        ** Ticket [2d1a5c67dfc2363e44f29d9bbd57f] 2011-05-18 */
-        rc = sqlite3PagerGet(pPager, 1, &pPageOne);
-        pList = pPageOne;
-        pList->pDirty = 0;
+        ** Ticket [2d1a5c67dfc2363e44f29d9bbd57f] 2011-05-18 */	
+        rc = sqlite3PagerGet(pPager, 1, &pPageOne);		获取第一页
+        pList = pPageOne;								指向该页面
+        pList->pDirty = 0;								下一个没有
       }
       assert( rc==SQLITE_OK );
-      if( ALWAYS(pList) ){
-        rc = pagerWalFrames(pPager, pList, pPager->dbSize, 1);
+      if( ALWAYS(pList) ){								
+        rc = pagerWalFrames(pPager, pList, pPager->dbSize, 1);	
       }
       sqlite3PagerUnref(pPageOne);
       if( rc==SQLITE_OK ){
         sqlite3PcacheCleanAll(pPager->pPCache);
       }
-    }else{
+    }else{	如果pager没有使用wal
       /* The following block updates the change-counter. Exactly how it
       ** does this depends on whether or not the atomic-update optimization
       ** was enabled at compile time, and if this transaction meets the 
@@ -6330,19 +6426,26 @@ int sqlite3PagerCommitPhaseTwo(Pager *pPager){
   ** to the database file. So there is no need to zero the journal 
   ** header. Since the pager is in exclusive mode, there is no need
   ** to drop any locks either.
+<<<<<<< HEAD
   一个优化。在当前事务中，数据库实际上未被修改，pager运行在exclusive-mode并且使用的是persistent journals，那么该函数无操作
+=======
+  一个优化：事务过程中数据库没有被实际的修改，pager运行于exclusive-mode并且使用persistent journals，那么该函数无操作。
+  
+  当前日志文件的开始包含了一个单独的日志头(包含设置为0的nRec域)。如果该日志被用于一个热日志回滚，数据库文件将不会被改变。所以无需将日志头0化。因为pager处于
+  exclusive模式，没有必要移除任何锁
+>>>>>>> 80e276d5822064d856d202a8f52da72f3d10b36b
   */
-  if( pPager->eState==PAGER_WRITER_LOCKED 
+  if( pPager->eState==PAGER_WRITER_LOCKED 			当前Pager状态==PAGER_WRITER_LOCKED && pager处于互斥模式下 && 日志模式为PAGER_JOURNALMODE_PERSIST
    && pPager->exclusiveMode 
    && pPager->journalMode==PAGER_JOURNALMODE_PERSIST
   ){
     assert( pPager->journalOff==JOURNAL_HDR_SZ(pPager) || !pPager->journalOff );
-    pPager->eState = PAGER_READER;
+    pPager->eState = PAGER_READER;				设置pager当前状态为PAGER_READER
     return SQLITE_OK;
   }
 
   PAGERTRACE(("COMMIT %d\n", PAGERID(pPager)));
-  rc = pager_end_transaction(pPager, pPager->setMaster);
+  rc = pager_end_transaction(pPager, pPager->setMaster);		结束事务
   return pager_error(pPager, rc);
 }
 
@@ -6947,7 +7050,7 @@ int sqlite3PagerLockingMode(Pager *pPager, int eMode){
 **    PAGER_JOURNALMODE_WAL
 **
 ** The journalmode is set to the value specified if the change is allowed.
-** The change may be disallowed for the following reasons:
+** The change may be disallowed for the following reasons: 
 **
 **   *  An in-memory database can only have its journal_mode set to _OFF
 **      or _MEMORY.

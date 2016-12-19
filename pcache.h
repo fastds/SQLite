@@ -98,7 +98,7 @@ void sqlite3PcacheCleanAll(PCache*);    /* Mark all dirty list pages as clean */
 void sqlite3PcacheMove(PgHdr*, Pgno);									//改变页面号
 
 /* Remove all pages with pgno>x.  Reset the cache if x==0 */
-void sqlite3PcacheTruncate(PCache*, Pgno x);
+void sqlite3PcacheTruncate(PCache*, Pgno x);			删除所有pgno>x的页面，如果x==0，重置缓冲区
 
 /* Get a list of all dirty pages in the cache, sorted by page number */
 PgHdr *sqlite3PcacheDirtyList(PCache*);
