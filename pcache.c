@@ -164,10 +164,11 @@ void sqlite3PcacheShutdown(void){
 int sqlite3PcacheSize(void){ return sizeof(PCache); }
 
 /*
-** Create a new PCache object. Storage space to hold the object						创建一个新的PCache对象。存储的对象的空间已经被分配并且作为p指针被传入。
-** has already been allocated and is passed in as the p pointer. 					调用者通过调用 sqlite3PcacheSize()知道多少的空间需要被分配
+** Create a new PCache object. Storage space to hold the object						
+** has already been allocated and is passed in as the p pointer. 					
 ** The caller discovers how much space needs to be allocated by 
 ** calling sqlite3PcacheSize().
+创建一个新的PCache对象。存储的对象的空间已经被分配并且作为p指针被传入。调用者通过调用 sqlite3PcacheSize()知道多少的空间需要被分配
 */
 void sqlite3PcacheOpen(
   int szPage,                  /* Size of every page */								每个页面的大小

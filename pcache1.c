@@ -10,11 +10,12 @@
 **
 *************************************************************************
 **
-** This file implements the default page cache implementation (the					该文件完成了默认页面缓存的实现(the sqlite3_pcache interface)。它也包含了SQLITE_CONFIG_PAGECACHE和sqlite3_release_memory()特性的实现。
-** sqlite3_pcache interface). It also contains part of the implementation			如果默认的页面缓存实现被覆盖，那么这两个特性都不可用
+** This file implements the default page cache implementation (the					
+** sqlite3_pcache interface). It also contains part of the implementation			
 ** of the SQLITE_CONFIG_PAGECACHE and sqlite3_release_memory() features.
 ** If the default page cache implementation is overriden, then neither of
 ** these two features are available.
+
 */
 
 #include "sqliteInt.h"
@@ -584,7 +585,7 @@ static void pcache1Shutdown(void *NotUsed){
 **
 ** Allocate a new cache.	用来分配新的pCache
 */
-static sqlite3_pcache *pcache1Create(int szPage, int szExtra, int bPurgeable){
+static sqlite3_pcache *pcache1Create(int szPage, int szExtra, int bPurgeable){		pCache->szPage, pCache->szExtra + sizeof(PgHdr), pCache->bPurgeable
   PCache1 *pCache;      /* The newly created page cache */		重新创建的页缓存
   PGroup *pGroup;       /* The group the new page cache will belong to */	新的页缓存所属的PGroup
   int sz;               /* Bytes of memory required to allocate the new cache */	分配给新缓存的内存字节数
